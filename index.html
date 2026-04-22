@@ -2,526 +2,706 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>群投票系统</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            200: '#bae6fd',
-                            300: '#7dd3fc',
-                            400: '#38bdf8',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
-                        },
-                        secondary: {
-                            50: '#f8fafc',
-                            100: '#f1f5f9',
-                            200: '#e2e8f0',
-                            300: '#cbd5e1',
-                            400: '#94a3b8',
-                            500: '#64748b',
-                            600: '#475569',
-                            700: '#334155',
-                            800: '#1e293b',
-                            900: '#0f172a',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>阿里云风格互动投票系统 | 实时统计</title>
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- Socket.IO 客户端 -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <!-- QRCode 生成库 -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f5f7fb;
+            color: #1e293b;
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+
+        /* 阿里云风格卡片与容器 */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 20px;
         }
-        .vote-option {
-            transition: all 0.3s ease;
+
+        .card {
+            background: #ffffff;
+            border-radius: 28px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+            transition: all 0.2s ease;
+            overflow: hidden;
+            border: 1px solid #eef2f9;
         }
-        .vote-option:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+
+        .card-header {
+            padding: 24px 28px 16px 28px;
+            border-bottom: 1px solid #eef2f9;
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #0052cc 0%, #0066ff 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
         }
-        .vote-option.selected {
-            border: 2px solid #0ea5e9;
-            background: rgba(14, 165, 233, 0.1);
+
+        .card-body {
+            padding: 28px;
         }
-        .chart-bar {
-            transition: height 0.5s ease;
+
+        /* 首页二维码区域 */
+        .qr-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 20px 30px;
         }
-        .notification {
-            animation: slideIn 0.5s ease forwards;
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 16px 0;
+            padding: 16px;
+            background: #fff;
+            border-radius: 28px;
+            box-shadow: 0 12px 24px -12px rgba(0,0,0,0.15);
         }
-        @keyframes slideIn {
-            from {
-                transform: translateY(-20px);
-                opacity: 0;
+        .qr-tip {
+            text-align: center;
+            margin-top: 16px;
+            color: #5b6e8c;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+        .btn-teacher {
+            background: linear-gradient(105deg, #0052cc, #0a66e9);
+            border: none;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 14px 28px;
+            border-radius: 48px;
+            cursor: pointer;
+            width: 80%;
+            max-width: 280px;
+            margin: 28px auto 12px auto;
+            display: block;
+            text-align: center;
+            transition: all 0.2s;
+            box-shadow: 0 6px 14px rgba(0,82,204,0.25);
+        }
+        .btn-teacher:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(105deg, #0043a8, #0058dd);
+            box-shadow: 0 12px 22px rgba(0,82,204,0.35);
+        }
+
+        /* 学生投票选项卡片 (现代风格) */
+        .options-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 28px;
+            justify-content: center;
+            margin-bottom: 36px;
+        }
+        .option-card {
+            flex: 1;
+            min-width: 220px;
+            background: #ffffff;
+            border-radius: 28px;
+            border: 1.5px solid #e9edf2;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        }
+        .option-card.selected {
+            border-color: #0052cc;
+            background: #f6f9ff;
+            box-shadow: 0 20px 30px -12px rgba(0,82,204,0.2);
+            transform: scale(1.02);
+        }
+        .option-img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #eef2fa;
+            transition: transform 0.3s;
+        }
+        .option-card:hover .option-img {
+            transform: scale(1.02);
+        }
+        .option-label {
+            padding: 18px 12px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #0f172a;
+            border-top: 1px solid #f0f4fa;
+            background: #ffffff;
+        }
+        .vote-btn {
+            background: #0052cc;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 600;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 56px;
+            width: 70%;
+            display: block;
+            margin: 8px auto 20px auto;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 8px rgba(0,82,204,0.2);
+        }
+        .vote-btn:hover {
+            background: #0040a3;
+            transform: scale(0.98);
+        }
+
+        /* 教师仪表板 */
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin-top: 10px;
+        }
+        .stats-info {
+            background: #f9fbfe;
+            border-radius: 28px;
+            padding: 20px 24px;
+            margin-top: 28px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            border: 1px solid #eef2fa;
+        }
+        .stat-item h4 {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #5b6e8c;
+            letter-spacing: 0.3px;
+            margin-bottom: 8px;
+        }
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #0052cc;
+        }
+        .footer-note {
+            margin-top: 28px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #8ca3ba;
+        }
+        .refresh-btn {
+            background: #eef2ff;
+            border: none;
+            color: #0052cc;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: 0.2s;
+        }
+        .refresh-btn:hover {
+            background: #e0e8fe;
+        }
+
+        .toast-msg {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293bdd;
+            backdrop-filter: blur(12px);
+            color: white;
+            padding: 12px 26px;
+            border-radius: 60px;
+            font-size: 0.9rem;
+            z-index: 1100;
+            pointer-events: none;
+            font-weight: 500;
+            transition: opacity 0.25s;
+        }
+
+        @media (max-width: 760px) {
+            .options-grid {
+                flex-direction: column;
+                gap: 18px;
             }
-            to {
-                transform: translateY(0);
-                opacity: 1;
+            .card-body {
+                padding: 20px;
+            }
+            .stat-number {
+                font-size: 1.7rem;
+            }
+            .vote-btn {
+                width: 90%;
             }
         }
-        .loading {
+        button {
+            background: none;
+            border: none;
+        }
+        .header-icon {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+            margin-right: 8px;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8">
-    <!-- Student View (Default) -->
-    <div id="studentView" class="max-w-4xl mx-auto">
-        <div class="glass-card rounded-2xl p-6">
-            <h2 class="text-2xl font-semibold text-secondary-800 mb-6 text-center">选择您的去向</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <!-- Option 1: Urban -->
-                <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="urban" onclick="selectOption('urban')">
-                    <div class="h-40 bg-gradient-to-r from-blue-400 to-blue-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400" alt="城市写字楼" class="w-full h-full object-cover">
-                    </div>
-                    <h3 class="font-semibold text-secondary-800 text-center">城市写字楼</h3>
-                    <p class="text-secondary-600 text-sm text-center mt-1">选择城市职场发展</p>
-                </div>
-
-                <!-- Option 2: Rural -->
-                <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="rural" onclick="selectOption('rural')">
-                    <div class="h-40 bg-gradient-to-r from-green-400 to-green-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400" alt="基层农村" class="w-full h-full object-cover">
-                    </div>
-                    <h3 class="font-semibold text-secondary-800 text-center">基层农村</h3>
-                    <p class="text-secondary-600 text-sm text-center mt-1">选择基层农村发展</p>
-                </div>
-
-                <!-- Option 3: Other -->
-                <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="other" onclick="selectOption('other')">
-                    <div class="h-40 bg-gradient-to-r from-purple-400 to-purple-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
-                        <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=400" alt="其他领域" class="w-full h-full object-cover">
-                    </div>
-                    <h3 class="font-semibold text-secondary-800 text-center">其他领域</h3>
-                    <p class="text-secondary-600 text-sm text-center mt-1">选择其他领域发展</p>
-                </div>
-            </div>
-
-            <div class="flex justify-center mb-4">
-                <button id="submitVote" class="bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" disabled>
-                    提交投票
-                </button>
-            </div>
-            
-            <div class="text-center mt-4">
-                <p class="text-secondary-600 text-sm">教师入口 <a href="?admin=true" class="text-primary-600 hover:underline">点击这里</a></p>
+<body>
+<div id="app">
+    <!-- 首页视图：二维码 + 教师入口 -->
+    <div id="homeView" class="container" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
+        <div class="card" style="width: 100%; max-width: 540px;">
+            <div class="card-header" style="text-align: center;">🗳️ 互动投票系统</div>
+            <div class="card-body qr-wrapper">
+                <div id="qrcode"></div>
+                <div class="qr-tip">📱 学生扫码参与 · 支持跨设备投票</div>
+                <button id="teacherEnterBtn" class="btn-teacher">👩‍🏫 教师进入后台</button>
+                <div class="footer-note" style="margin-top: 24px;">数据实时同步 | 阿里云风格仪表板</div>
             </div>
         </div>
     </div>
 
-    <!-- Teacher View -->
-    <div id="teacherView" class="hidden max-w-4xl mx-auto">
-        <div class="glass-card rounded-2xl p-6">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-semibold text-secondary-800">投票结果统计</h2>
-                <div class="flex space-x-4">
-                    <button id="resetVotes" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300">
-                        <i class="fas fa-redo mr-1"></i> 重置投票
-                    </button>
-                    <button id="exportData" class="bg-secondary-600 hover:bg-secondary-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300">
-                        <i class="fas fa-download mr-1"></i> 导出数据
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Results Chart -->
-            <div class="bg-white rounded-xl p-6 shadow-sm">
-                <div class="flex items-end justify-around h-80 border-b border-secondary-200">
-                    <div class="flex flex-col items-center">
-                        <div class="chart-bar bg-blue-500 w-20 rounded-t-lg" id="urbanBar" style="height: 0%"></div>
-                        <div class="mt-2 text-center">
-                            <p class="font-medium text-secondary-800">城市写字楼</p>
-                            <p class="text-secondary-600" id="urbanCount">0票</p>
+    <!-- 学生投票视图 -->
+    <div id="studentView" style="display: none;">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">✨ 选择你关注的领域</div>
+                <div class="card-body">
+                    <div class="options-grid" id="optionsGrid">
+                        <div class="option-card" data-value="city">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&h=300&fit=crop" alt="城市写字楼" onerror="this.src='https://picsum.photos/id/104/400/200'">
+                            <div class="option-label">🏙️ 城市写字楼 · 数字经济</div>
+                        </div>
+                        <div class="option-card" data-value="rural">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=500&h=300&fit=crop" alt="基层农村" onerror="this.src='https://picsum.photos/id/15/400/200'">
+                            <div class="option-label">🌾 基层农村 · 乡村振兴</div>
+                        </div>
+                        <div class="option-card" data-value="other">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&h=300&fit=crop" alt="其他领域" onerror="this.src='https://picsum.photos/id/91/400/200'">
+                            <div class="option-label">🚀 其他领域 · 科技创新</div>
                         </div>
                     </div>
-                    <div class="flex flex-col items-center">
-                        <div class="chart-bar bg-green-500 w-20 rounded-t-lg" id="ruralBar" style="height: 0%"></div>
-                        <div class="mt-2 text-center">
-                            <p class="font-medium text-secondary-800">基层农村</p>
-                            <p class="text-secondary-600" id="ruralCount">0票</p>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-center">
-                        <div class="chart-bar bg-purple-500 w-20 rounded-t-lg" id="otherBar" style="height: 0%"></div>
-                        <div class="mt-2 text-center">
-                            <p class="font-medium text-secondary-800">其他领域</p>
-                            <p class="text-secondary-600" id="otherCount">0票</p>
-                        </div>
-                    </div>
+                    <button id="submitVoteBtn" class="vote-btn">🗳️ 立即投票</button>
+                    <div class="footer-note">💡 可再次投票覆盖原有选择 · 每一票都算数</div>
                 </div>
-                <div class="mt-4 text-center">
-                    <p class="text-secondary-600">总投票数: <span id="totalVotes" class="font-semibold">0</span> 票</p>
-                </div>
-            </div>
-            
-            <div class="mt-6">
-                <h3 class="text-lg font-semibold text-secondary-800 mb-4">投票记录</h3>
-                <div class="bg-white rounded-xl p-4 shadow-sm overflow-x-auto">
-                    <table class="min-w-full">
-                        <thead>
-                            <tr class="border-b border-secondary-200">
-                                <th class="py-2 px-4 text-left text-secondary-600">时间</th>
-                                <th class="py-2 px-4 text-left text-secondary-600">选项</th>
-                                <th class="py-2 px-4 text-left text-secondary-600">用户ID</th>
-                            </tr>
-                        </thead>
-                        <tbody id="voteRecords">
-                            <!-- Vote records will be inserted here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div class="text-center mt-6">
-                <p class="text-secondary-600 text-sm">返回学生视图 <a href="?" class="text-primary-600 hover:underline">点击这里</a></p>
             </div>
         </div>
     </div>
 
-    <!-- Notification Container -->
-    <div id="notificationContainer" class="fixed top-4 right-4 z-50"></div>
+    <!-- 教师视图：柱状图 + 实时统计 -->
+    <div id="teacherView" style="display: none;">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">📊 实时投票占比分析</div>
+                <div class="card-body">
+                    <div id="barChart" class="chart-container"></div>
+                    <div class="stats-info" id="statsInfo">
+                        <div class="stat-item"><h4>🏙️ 城市写字楼</h4><span class="stat-number" id="cityCount">0</span></div>
+                        <div class="stat-item"><h4>🌾 基层农村</h4><span class="stat-number" id="ruralCount">0</span></div>
+                        <div class="stat-item"><h4>🚀 其他领域</h4><span class="stat-number" id="otherCount">0</span></div>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 16px; margin-top: 16px;">
+                        <button id="manualRefreshBtn" class="refresh-btn">🔄 手动刷新数据</button>
+                    </div>
+                    <div class="footer-note">📡 跨设备实时同步 | Socket.io 推送更新</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+    // ----------------------------- 前端核心逻辑 (支持实时通信与降级轮询) -----------------------------
+    const BASE_URL = window.location.origin;
+    // 连接 Socket.IO
+    const socket = io(BASE_URL, { autoConnect: true, reconnection: true });
+    let currentView = 'home';
+    let selectedOption = null;
+    // 设备唯一标识 (localStorage)
+    let deviceId = localStorage.getItem('vote_device_id');
+    if (!deviceId) {
+        deviceId = 'device_' + Math.random().toString(36).substring(2, 12) + Date.now();
+        localStorage.setItem('vote_device_id', deviceId);
+    }
+    let hasVotedCache = false;      // 前端辅助标记
     
-    <script>
-        // Firebase configuration
-        // 请替换为您自己的Firebase配置信息
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            databaseURL: "YOUR_DATABASE_URL",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        };
-        
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-        
-        let selectedOption = null;
-        const adminPassword = "teacher123"; // Simple password for demo
-        
-        // Check URL parameters to determine view
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const isAdmin = urlParams.get('admin') === 'true';
-            
-            if (isAdmin) {
-                // Show teacher view
-                document.getElementById('studentView').classList.add('hidden');
-                document.getElementById('teacherView').classList.remove('hidden');
-                
-                // Prompt for password
-                const password = prompt('请输入教师密码:');
-                if (password !== adminPassword) {
-                    showNotification('密码错误，将返回学生视图', 'error');
-                    setTimeout(() => {
-                        window.location.href = window.location.pathname;
-                    }, 2000);
+    // ---------- 辅助函数 ----------
+    function showToast(msg, duration = 2600) {
+        let toast = document.querySelector('.toast-msg');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'toast-msg';
+            document.body.appendChild(toast);
+        }
+        toast.innerText = msg;
+        toast.style.opacity = '1';
+        setTimeout(() => {
+            toast.style.opacity = '0';
+        }, duration);
+    }
+
+    function getOptionText(val) {
+        if (val === 'city') return '城市写字楼';
+        if (val === 'rural') return '基层农村';
+        return '其他领域';
+    }
+
+    // 切换视图
+    function showView(view) {
+        document.getElementById('homeView').style.display = 'none';
+        document.getElementById('studentView').style.display = 'none';
+        document.getElementById('teacherView').style.display = 'none';
+        if (view === 'home') {
+            document.getElementById('homeView').style.display = 'flex';
+            currentView = 'home';
+            generateQRCode();
+        } else if (view === 'student') {
+            document.getElementById('studentView').style.display = 'block';
+            currentView = 'student';
+            resetStudentUI();
+            checkUserPreviousVote();
+            bindStudentEvents();
+        } else if (view === 'teacher') {
+            document.getElementById('teacherView').style.display = 'block';
+            currentView = 'teacher';
+            initTeacherChart();
+            fetchStatsAndRender();
+            // 开启轮询保底 (如果socket断连)
+            if (window.statsInterval) clearInterval(window.statsInterval);
+            window.statsInterval = setInterval(() => {
+                if (currentView === 'teacher') fetchStatsAndRender();
+            }, 8000);
+        } else {
+            if (window.statsInterval) clearInterval(window.statsInterval);
+        }
+    }
+
+    // 首页二维码生成 (学生投票页面链接)
+    function generateQRCode() {
+        const studentUrl = `${BASE_URL}?role=student`;
+        const container = document.getElementById('qrcode');
+        if (container) {
+            container.innerHTML = '';
+            new QRCode(container, {
+                text: studentUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#0052cc",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+    }
+
+    // 重置学生视图样式
+    function resetStudentUI() {
+        selectedOption = null;
+        document.querySelectorAll('.option-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+    }
+
+    // 查询用户之前的投票
+    async function checkUserPreviousVote() {
+        try {
+            const resp = await fetch(`${BASE_URL}/api/user/vote?deviceId=${deviceId}`);
+            const data = await resp.json();
+            if (data.voted && data.option) {
+                hasVotedCache = true;
+                selectedOption = data.option;
+                // 高亮已有选项
+                document.querySelectorAll('.option-card').forEach(card => {
+                    if (card.getAttribute('data-value') === data.option) {
+                        card.classList.add('selected');
+                    }
+                });
+                showToast(`您上次投票给了“${getOptionText(data.option)}”，可再次投票更改`);
+            } else {
+                hasVotedCache = false;
+            }
+        } catch (err) {
+            console.warn("查询历史失败", err);
+        }
+    }
+
+    // 投票提交 (支持覆盖)
+    async function submitVote(optionValue, isOverride = false) {
+        if (!optionValue) {
+            showToast("请先选择一个选项");
+            return false;
+        }
+        try {
+            const payload = { deviceId, option: optionValue, override: isOverride };
+            const resp = await fetch(`${BASE_URL}/api/vote`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            if (result.success) {
+                showToast(`✅ 投票成功！支持“${getOptionText(optionValue)}”`);
+                hasVotedCache = true;
+                return true;
+            } else if (result.alreadyVoted && !isOverride) {
+                const userConfirm = confirm(`您已投给“${getOptionText(result.currentOption)}”，是否要改为“${getOptionText(optionValue)}”？`);
+                if (userConfirm) {
+                    return await submitVote(optionValue, true);
+                } else {
+                    showToast("未更改投票");
+                    return false;
                 }
             } else {
-                // Show student view
-                document.getElementById('studentView').classList.remove('hidden');
-                document.getElementById('teacherView').classList.add('hidden');
-                
-                // Check if user has already voted
-                if (localStorage.getItem('hasVoted')) {
-                    document.getElementById('submitVote').textContent = '已投票';
-                    document.getElementById('submitVote').disabled = true;
-                    
-                    // Show notification
-                    showNotification('您已经投过票了', 'info');
-                }
+                showToast(result.message || "投票失败，请稍后重试");
+                return false;
             }
-            
-            // Listen for vote data changes
-            listenForVoteChanges();
+        } catch (err) {
+            console.error(err);
+            showToast("网络错误，投票失败");
+            return false;
+        }
+    }
+
+    // 学生卡片事件
+    function bindStudentEvents() {
+        const cards = document.querySelectorAll('.option-card');
+        cards.forEach(card => {
+            card.removeEventListener('click', cardClickHandler);
+            card.addEventListener('click', cardClickHandler);
         });
-        
-        // Listen for vote data changes in real-time
-        function listenForVoteChanges() {
-            const votesRef = database.ref('votes');
-            votesRef.on('value', (snapshot) => {
-                const voteData = snapshot.val() || { urban: 0, rural: 0, other: 0 };
-                updateChart(voteData);
-            });
-            
-            // Listen for vote records
-            const recordsRef = database.ref('records');
-            recordsRef.orderByChild('time').limitToLast(10).on('value', (snapshot) => {
-                const records = snapshot.val() || {};
-                updateVoteRecords(records);
-            });
+        const voteBtn = document.getElementById('submitVoteBtn');
+        if (voteBtn) {
+            voteBtn.removeEventListener('click', voteClickHandler);
+            voteBtn.addEventListener('click', voteClickHandler);
         }
-        
-        // Select vote option
-        function selectOption(option) {
-            // Remove selected class from all options
-            document.querySelectorAll('.vote-option').forEach(el => {
-                el.classList.remove('selected');
-            });
-            
-            // Add selected class to clicked option
-            document.querySelector(`.vote-option[data-option="${option}"]`).classList.add('selected');
-            
-            // Update selected option
-            selectedOption = option;
-            
-            // Enable submit button
-            document.getElementById('submitVote').disabled = false;
+    }
+    function cardClickHandler(e) {
+        const card = e.currentTarget;
+        const value = card.getAttribute('data-value');
+        selectedOption = value;
+        document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+    }
+    async function voteClickHandler() {
+        if (!selectedOption) {
+            showToast("请先选择一个领域");
+            return;
         }
-        
-        // Submit vote
-        document.getElementById('submitVote').addEventListener('click', function() {
-            if (!selectedOption) {
-                showNotification('请选择一个选项', 'error');
-                return;
+        await submitVote(selectedOption, false);
+    }
+
+    // ---------- 教师端图表 & 统计 ----------
+    let barChart = null;
+    function initTeacherChart() {
+        const dom = document.getElementById('barChart');
+        if (barChart) barChart.dispose();
+        barChart = echarts.init(dom);
+        const option = {
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: '#fff', borderColor: '#0052cc', borderWidth: 1 },
+            grid: { left: '8%', right: '5%', top: '12%', bottom: '5%', containLabel: true },
+            xAxis: { type: 'category', data: ['城市写字楼', '基层农村', '其他领域'], axisLabel: { fontWeight: 500, fontSize: 13, color: '#334155' } },
+            yAxis: { type: 'value', name: '票数', nameLocation: 'middle', nameGap: 45, axisLabel: { fontWeight: 500 } },
+            series: [{
+                data: [0, 0, 0],
+                type: 'bar',
+                barWidth: '48%',
+                itemStyle: {
+                    borderRadius: [12, 12, 0, 0],
+                    color: '#0052cc',
+                    shadowColor: 'rgba(0,82,204,0.3)',
+                    shadowBlur: 12
+                },
+                label: { show: true, position: 'top', fontWeight: 'bold', fontSize: 13 }
+            }]
+        };
+        barChart.setOption(option);
+    }
+
+    async function fetchStatsAndRender() {
+        try {
+            const resp = await fetch(`${BASE_URL}/api/stats`);
+            const stats = await resp.json();
+            const city = stats.city || 0;
+            const rural = stats.rural || 0;
+            const other = stats.other || 0;
+            document.getElementById('cityCount').innerText = city;
+            document.getElementById('ruralCount').innerText = rural;
+            document.getElementById('otherCount').innerText = other;
+            if (barChart) {
+                barChart.setOption({ series: [{ data: [city, rural, other] }] });
+            } else {
+                initTeacherChart();
+                barChart.setOption({ series: [{ data: [city, rural, other] }] });
             }
-            
-            // Check if user has already voted
-            if (localStorage.getItem('hasVoted')) {
-                showNotification('您已经投过票了', 'error');
-                return;
-            }
-            
-            // Show loading state
-            this.innerHTML = '<span class="loading"></span> 提交中...';
-            this.disabled = true;
-            
-            // Get a reference to the vote count
-            const voteRef = database.ref(`votes/${selectedOption}`);
-            
-            // Increment the vote count atomically
-            voteRef.transaction((currentCount) => {
-                return (currentCount || 0) + 1;
-            }).then(() => {
-                // Add vote record
-                const record = {
-                    time: new Date().toISOString(),
-                    option: getOptionName(selectedOption),
-                    userId: generateUserId()
-                };
-                
-                // Push record to Firebase
-                const newRecordRef = database.ref('records').push();
-                newRecordRef.set(record);
-                
-                // Mark user as voted
-                localStorage.setItem('hasVoted', 'true');
-                
-                // Show success notification
-                showNotification('投票成功！感谢您的参与', 'success');
-                
-                // Update button
-                document.getElementById('submitVote').textContent = '已投票';
-            }).catch((error) => {
-                console.error('Error submitting vote:', error);
-                showNotification('投票失败，请重试', 'error');
-                document.getElementById('submitVote').textContent = '提交投票';
-                document.getElementById('submitVote').disabled = false;
-            });
-        });
-        
-        // Reset votes
-        document.getElementById('resetVotes').addEventListener('click', function() {
-            if (confirm('确定要重置所有投票数据吗？此操作不可撤销。')) {
-                // Reset vote data in Firebase
-                database.ref('votes').set({
-                    urban: 0,
-                    rural: 0,
-                    other: 0
-                });
-                
-                // Clear vote records
-                database.ref('records').set({});
-                
-                // Show success notification
-                showNotification('投票数据已重置', 'success');
-            }
-        });
-        
-        // Export data
-        document.getElementById('exportData').addEventListener('click', function() {
-            // Get all records from Firebase
-            database.ref('records').once('value', (snapshot) => {
-                const records = snapshot.val() || {};
-                
-                // Create CSV content
-                let csvContent = "时间,选项,用户ID\n";
-                
-                Object.values(records).forEach(record => {
-                    csvContent += `${record.time},${record.option},${record.userId}\n`;
-                });
-                
-                // Create download link
-                const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "投票记录_" + new Date().toLocaleDateString() + ".csv");
-                document.body.appendChild(link);
-                
-                // Trigger download
-                link.click();
-                
-                // Clean up
-                document.body.removeChild(link);
-                
-                // Show success notification
-                showNotification('数据导出成功', 'success');
-            });
-        });
-        
-        // Update chart
-        function updateChart(voteData) {
-            const total = voteData.urban + voteData.rural + voteData.other;
-            
-            // Calculate percentages
-            const urbanPercent = total > 0 ? (voteData.urban / total) * 100 : 0;
-            const ruralPercent = total > 0 ? (voteData.rural / total) * 100 : 0;
-            const otherPercent = total > 0 ? (voteData.other / total) * 100 : 0;
-            
-            // Update bars
-            document.getElementById('urbanBar').style.height = `${urbanPercent}%`;
-            document.getElementById('ruralBar').style.height = `${ruralPercent}%`;
-            document.getElementById('otherBar').style.height = `${otherPercent}%`;
-            
-            // Update counts
-            document.getElementById('urbanCount').textContent = `${voteData.urban}票 (${urbanPercent.toFixed(1)}%)`;
-            document.getElementById('ruralCount').textContent = `${voteData.rural}票 (${ruralPercent.toFixed(1)}%)`;
-            document.getElementById('otherCount').textContent = `${voteData.other}票 (${otherPercent.toFixed(1)}%)`;
-            
-            // Update total
-            document.getElementById('totalVotes').textContent = total;
+        } catch (err) {
+            console.warn("拉取统计失败", err);
         }
-        
-        // Update vote records table
-        function updateVoteRecords(records) {
-            const recordsTable = document.getElementById('voteRecords');
-            recordsTable.innerHTML = '';
-            
-            if (Object.keys(records).length === 0) {
-                recordsTable.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-secondary-600">暂无投票记录</td></tr>';
-                return;
-            }
-            
-            // Convert records object to array and sort by time (newest first)
-            const recordsArray = Object.values(records).sort((a, b) => {
-                return new Date(b.time) - new Date(a.time);
-            });
-            
-            // Show last 10 records
-            recordsArray.slice(0, 10).forEach(record => {
-                const row = document.createElement('tr');
-                row.className = 'border-b border-secondary-100';
-                row.innerHTML = `
-                    <td class="py-2 px-4 text-secondary-600">${new Date(record.time).toLocaleString()}</td>
-                    <td class="py-2 px-4 text-secondary-600">${record.option}</td>
-                    <td class="py-2 px-4 text-secondary-600">${record.userId}</td>
-                `;
-                recordsTable.appendChild(row);
-            });
+    }
+
+    // 监听 socket 实时推送
+    socket.on('connect', () => {
+        console.log('Socket 已连接，实时同步已启用');
+        if (currentView === 'teacher') fetchStatsAndRender();
+    });
+    socket.on('voteUpdate', (data) => {
+        if (currentView === 'teacher') {
+            fetchStatsAndRender();
         }
-        
-        // Show notification
-        function showNotification(message, type) {
-            const container = document.getElementById('notificationContainer');
-            const notification = document.createElement('div');
-            
-            let bgColor, icon;
-            switch (type) {
-                case 'success':
-                    bgColor = 'bg-green-500';
-                    icon = 'fa-check-circle';
-                    break;
-                case 'error':
-                    bgColor = 'bg-red-500';
-                    icon = 'fa-exclamation-circle';
-                    break;
-                case 'info':
-                    bgColor = 'bg-blue-500';
-                    icon = 'fa-info-circle';
-                    break;
-                default:
-                    bgColor = 'bg-secondary-500';
-                    icon = 'fa-bell';
-            }
-            
-            notification.className = `notification ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg mb-2 flex items-center`;
-            notification.innerHTML = `
-                <i class="fas ${icon} mr-2"></i>
-                <span>${message}</span>
-            `;
-            
-            container.appendChild(notification);
-            
-            // Remove notification after 3 seconds
-            setTimeout(() => {
-                notification.style.opacity = '0';
-                notification.style.transform = 'translateY(-10px)';
-                notification.style.transition = 'all 0.3s ease';
-                
-                setTimeout(() => {
-                    container.removeChild(notification);
-                }, 300);
-            }, 3000);
+        // 可选: 学生端也可以轻提示更新
+        if (currentView === 'student') {
+            // 无需频繁刷新，但是可以静默更新后台，保持统计新鲜
         }
-        
-        // Get option name
-        function getOptionName(option) {
-            switch (option) {
-                case 'urban':
-                    return '城市写字楼';
-                case 'rural':
-                    return '基层农村';
-                case 'other':
-                    return '其他领域';
-                default:
-                    return '未知选项';
-            }
+    });
+    socket.on('disconnect', () => {
+        console.warn('Socket断开，使用轮询保障');
+    });
+
+    // 手动刷新教师数据
+    document.getElementById('manualRefreshBtn')?.addEventListener('click', () => {
+        if (currentView === 'teacher') fetchStatsAndRender();
+        showToast("数据已刷新");
+    });
+
+    // 教师入口按钮
+    document.getElementById('teacherEnterBtn')?.addEventListener('click', () => {
+        showView('teacher');
+        window.history.pushState({}, '', '?role=teacher');
+    });
+
+    // 路由解析 (基于URL参数)
+    function handleRouting() {
+        const params = new URLSearchParams(window.location.search);
+        const role = params.get('role');
+        if (role === 'student') {
+            showView('student');
+        } else if (role === 'teacher') {
+            showView('teacher');
+        } else {
+            showView('home');
         }
-        
-        // Generate random user ID
-        function generateUserId() {
-            return 'user_' + Math.random().toString(36).substr(2, 9);
-        }
-    </script>
+    }
+
+    window.addEventListener('popstate', () => handleRouting());
+    handleRouting();
+
+    // 清理轮询定时器防止内存
+    window.addEventListener('beforeunload', () => {
+        if (window.statsInterval) clearInterval(window.statsInterval);
+    });
+</script>
 </body>
 </html>
+
+<!-- 
+======================= 配套后端服务 (Node.js + Express + Socket.io) =======================
+请将上述 HTML 代码保存为 public/index.html，并创建 server.js 在同一目录下，执行以下步骤：
+
+1. 新建文件夹 vote-system，将本HTML文件放入 vote-system/public/index.html
+2. 在 vote-system 目录下创建 server.js 并复制下方代码
+3. 终端运行: npm init -y && npm install express socket.io
+4. 启动服务: node server.js
+5. 访问 http://localhost:3000 即可体验跨设备投票 + 教师实时柱状图
+
+确保手机和电脑在同一局域网，手机扫码时把 localhost 替换为电脑IP地址 (例如 http://192.168.x.x:3000?role=student)
+-->
+
+<!-- 以下是 server.js 完整代码 (请单独保存) -->
+<!-- 
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const socketIo = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, { cors: { origin: "*" } });
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+const DATA_FILE = path.join(__dirname, 'voteData.json');
+
+function loadData() {
+    if (!fs.existsSync(DATA_FILE)) {
+        return { userVotes: {}, stats: { city: 0, rural: 0, other: 0 } };
+    }
+    try {
+        return JSON.parse(fs.readFileSync(DATA_FILE));
+    } catch(e) {
+        return { userVotes: {}, stats: { city: 0, rural: 0, other: 0 } };
+    }
+}
+
+function saveData(data) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
+function recomputeStats(data) {
+    const stats = { city: 0, rural: 0, other: 0 };
+    Object.values(data.userVotes).forEach(opt => {
+        if (opt === 'city') stats.city++;
+        else if (opt === 'rural') stats.rural++;
+        else if (opt === 'other') stats.other++;
+    });
+    data.stats = stats;
+    return stats;
+}
+
+function broadcastStats() {
+    const data = loadData();
+    io.emit('voteUpdate', data.stats);
+}
+
+app.post('/api/vote', (req, res) => {
+    const { deviceId, option, override } = req.body;
+    if (!deviceId || !['city','rural','other'].includes(option)) {
+        return res.status(400).json({ success: false, message: '参数错误' });
+    }
+    let data = loadData();
+    const existing = data.userVotes[deviceId];
+    if (existing && !override) {
+        return res.json({ alreadyVoted: true, currentOption: existing, success: false });
+    }
+    data.userVotes[deviceId] = option;
+    recomputeStats(data);
+    saveData(data);
+    broadcastStats();
+    res.json({ success: true, message: '投票成功' });
+});
+
+app.get('/api/user/vote', (req, res) => {
+    const { deviceId } = req.query;
+    if (!deviceId) return res.json({ voted: false });
+    const data = loadData();
+    const voted = !!data.userVotes[deviceId];
+    const option = data.userVotes[deviceId] || null;
+    res.json({ voted, option });
+});
+
+app.get('/api/stats', (req, res) => {
+    const data = loadData();
+    res.json(data.stats);
+});
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`✅ 投票系统运行在 http://localhost:${PORT}`);
+    console.log(`📊 教师端: http://localhost:${PORT}?role=teacher`);
+    console.log(`📱 学生扫码入口: http://localhost:${PORT}?role=student (手机扫码请用IP地址访问)`);
+});
+-->
