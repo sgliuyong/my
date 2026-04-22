@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>群投票系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+        .vote-option {
+            transition: all 0.3s ease;
+        }
+        .vote-option:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        .vote-option.selected {
+            border: 2px solid #0ea5e9;
+            background: rgba(14, 165, 233, 0.1);
+        }
+        .chart-bar {
+            transition: height 0.5s ease;
+        }
+        .qr-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .qr-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                to bottom right,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.3) 50%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+        @keyframes shine {
+            0% {
+                transform: translateX(-100%) rotate(45deg);
+            }
+            100% {
+                transform: translateX(100%) rotate(45deg);
+            }
+        }
+        .notification {
+            animation: slideIn 0.5s ease forwards;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-secondary-800 mb-2">群投票系统</h1>
+            <p class="text-secondary-600">请扫描二维码或直接参与投票</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- QR Code Section -->
+            <div class="glass-card rounded-2xl p-6 flex flex-col items-center justify-center">
+                <h2 class="text-xl font-semibold text-secondary-800 mb-4">扫码投票</h2>
+                <div class="qr-container bg-white p-4 rounded-xl shadow-md mb-4">
+                    <div id="qrcode" class="w-36 h-36"></div>
+                </div>
+                <p class="text-secondary-600 text-sm text-center">使用手机扫描二维码参与投票</p>
+                <div class="mt-4 text-center">
+                    <p class="text-secondary-600 text-sm">投票链接：</p>
+                    <p id="voteUrl" class="text-primary-600 text-sm font-medium break-all"></p>
+                </div>
+            </div>
+
+            <!-- Voting Options -->
+            <div class="lg:col-span-2 glass-card rounded-2xl p-6">
+                <h2 class="text-xl font-semibold text-secondary-800 mb-6">选择您的去向</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <!-- Option 1: Urban -->
+                    <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="urban" onclick="selectOption('urban')">
+                        <div class="h-32 bg-gradient-to-r from-blue-400 to-blue-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400" alt="城市写字楼" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="font-semibold text-secondary-800 text-center">城市写字楼</h3>
+                        <p class="text-secondary-600 text-sm text-center mt-1">选择城市职场发展</p>
+                    </div>
+
+                    <!-- Option 2: Rural -->
+                    <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="rural" onclick="selectOption('rural')">
+                        <div class="h-32 bg-gradient-to-r from-green-400 to-green-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400" alt="基层农村" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="font-semibold text-secondary-800 text-center">基层农村</h3>
+                        <p class="text-secondary-600 text-sm text-center mt-1">选择基层农村发展</p>
+                    </div>
+
+                    <!-- Option 3: Other -->
+                    <div class="vote-option glass-card rounded-xl p-4 cursor-pointer" data-option="other" onclick="selectOption('other')">
+                        <div class="h-32 bg-gradient-to-r from-purple-400 to-purple-600 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=400" alt="其他领域" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="font-semibold text-secondary-800 text-center">其他领域</h3>
+                        <p class="text-secondary-600 text-sm text-center mt-1">选择其他领域发展</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-center mb-6">
+                    <button id="submitVote" class="bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" disabled>
+                        提交投票
+                    </button>
+                </div>
+
+                <!-- Results Chart -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold text-secondary-800 mb-4">投票结果</h3>
+                    <div class="bg-white rounded-xl p-4 shadow-sm">
+                        <div class="flex items-end justify-around h-64 border-b border-secondary-200">
+                            <div class="flex flex-col items-center">
+                                <div class="chart-bar bg-blue-500 w-16 rounded-t-lg" id="urbanBar" style="height: 0%"></div>
+                                <div class="mt-2 text-center">
+                                    <p class="font-medium text-secondary-800">城市写字楼</p>
+                                    <p class="text-secondary-600" id="urbanCount">0票</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="chart-bar bg-green-500 w-16 rounded-t-lg" id="ruralBar" style="height: 0%"></div>
+                                <div class="mt-2 text-center">
+                                    <p class="font-medium text-secondary-800">基层农村</p>
+                                    <p class="text-secondary-600" id="ruralCount">0票</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="chart-bar bg-purple-500 w-16 rounded-t-lg" id="otherBar" style="height: 0%"></div>
+                                <div class="mt-2 text-center">
+                                    <p class="font-medium text-secondary-800">其他领域</p>
+                                    <p class="text-secondary-600" id="otherCount">0票</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-center">
+                            <p class="text-secondary-600">总投票数: <span id="totalVotes" class="font-semibold">0</span> 票</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Teacher Admin Panel -->
+        <div class="glass-card rounded-2xl p-6 mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-secondary-800">教师管理面板</h2>
+                <button id="toggleAdmin" class="text-primary-600 hover:text-primary-800 font-medium">
+                    <i class="fas fa-lock mr-1"></i> 显示管理选项
+                </button>
+            </div>
+            
+            <div id="adminPanel" class="hidden">
+                <div class="bg-white rounded-xl p-4 shadow-sm mb-4">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div class="mb-4 md:mb-0">
+                            <label class="block text-secondary-700 font-medium mb-2">教师密码:</label>
+                            <input type="password" id="adminPassword" class="border border-secondary-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="输入教师密码">
+                        </div>
+                        <div class="flex space-x-4">
+                            <button id="resetVotes" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300">
+                                <i class="fas fa-redo mr-1"></i> 重置投票
+                            </button>
+                            <button id="exportData" class="bg-secondary-600 hover:bg-secondary-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300">
+                                <i class="fas fa-download mr-1"></i> 导出数据
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <h3 class="font-medium text-secondary-800 mb-2">投票记录</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-secondary-200">
+                                    <th class="py-2 px-4 text-left text-secondary-600">时间</th>
+                                    <th class="py-2 px-4 text-left text-secondary-600">选项</th>
+                                    <th class="py-2 px-4 text-left text-secondary-600">用户ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="voteRecords">
+                                <!-- Vote records will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="fixed top-4 right-4 z-50"></div>
+
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    
+    <script>
+        // Initialize vote data from localStorage or create new
+        let voteData = JSON.parse(localStorage.getItem('voteData')) || {
+            urban: 0,
+            rural: 0,
+            other: 0,
+            records: []
+        };
+        
+        let selectedOption = null;
+        const adminPassword = "teacher123"; // Simple password for demo
+        
+        // Generate QR code with current page URL
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get current URL
+            const currentUrl = window.location.href;
+            
+            // Display the URL
+            document.getElementById('voteUrl').textContent = currentUrl;
+            
+            // Generate QR code
+            new QRCode(document.getElementById("qrcode"), {
+                text: currentUrl,
+                width: 144,
+                height: 144,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // Update chart on page load
+            updateChart();
+            updateVoteRecords();
+            
+            // Check if user has already voted
+            if (localStorage.getItem('hasVoted')) {
+                document.getElementById('submitVote').textContent = '已投票';
+                document.getElementById('submitVote').disabled = true;
+                
+                // Show notification
+                showNotification('您已经投过票了', 'info');
+            }
+        });
+        
+        // Select vote option
+        function selectOption(option) {
+            // Remove selected class from all options
+            document.querySelectorAll('.vote-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked option
+            document.querySelector(`.vote-option[data-option="${option}"]`).classList.add('selected');
+            
+            // Update selected option
+            selectedOption = option;
+            
+            // Enable submit button
+            document.getElementById('submitVote').disabled = false;
+        }
+        
+        // Submit vote
+        document.getElementById('submitVote').addEventListener('click', function() {
+            if (!selectedOption) {
+                showNotification('请选择一个选项', 'error');
+                return;
+            }
+            
+            // Check if user has already voted
+            if (localStorage.getItem('hasVoted')) {
+                showNotification('您已经投过票了', 'error');
+                return;
+            }
+            
+            // Update vote count
+            voteData[selectedOption]++;
+            
+            // Add vote record
+            const record = {
+                time: new Date().toLocaleString(),
+                option: getOptionName(selectedOption),
+                userId: generateUserId()
+            };
+            voteData.records.push(record);
+            
+            // Save to localStorage
+            localStorage.setItem('voteData', JSON.stringify(voteData));
+            localStorage.setItem('hasVoted', 'true');
+            
+            // Update UI
+            updateChart();
+            updateVoteRecords();
+            
+            // Show success notification
+            showNotification('投票成功！感谢您的参与', 'success');
+            
+            // Update button
+            this.textContent = '已投票';
+            this.disabled = true;
+        });
+        
+        // Toggle admin panel
+        document.getElementById('toggleAdmin').addEventListener('click', function() {
+            const adminPanel = document.getElementById('adminPanel');
+            adminPanel.classList.toggle('hidden');
+            
+            this.innerHTML = adminPanel.classList.contains('hidden') 
+                ? '<i class="fas fa-lock mr-1"></i> 显示管理选项'
+                : '<i class="fas fa-unlock mr-1"></i> 隐藏管理选项';
+        });
+        
+        // Reset votes
+        document.getElementById('resetVotes').addEventListener('click', function() {
+            const password = document.getElementById('adminPassword').value;
+            
+            if (password !== adminPassword) {
+                showNotification('密码错误，请重试', 'error');
+                return;
+            }
+            
+            if (confirm('确定要重置所有投票数据吗？此操作不可撤销。')) {
+                // Reset vote data
+                voteData = {
+                    urban: 0,
+                    rural: 0,
+                    other: 0,
+                    records: []
+                };
+                
+                // Save to localStorage
+                localStorage.setItem('voteData', JSON.stringify(voteData));
+                localStorage.removeItem('hasVoted');
+                
+                // Update UI
+                updateChart();
+                updateVoteRecords();
+                
+                // Reset submit button
+                document.getElementById('submitVote').textContent = '提交投票';
+                document.getElementById('submitVote').disabled = true;
+                
+                // Reset selected option
+                selectedOption = null;
+                document.querySelectorAll('.vote-option').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                
+                // Show success notification
+                showNotification('投票数据已重置', 'success');
+            }
+        });
+        
+        // Export data
+        document.getElementById('exportData').addEventListener('click', function() {
+            const password = document.getElementById('adminPassword').value;
+            
+            if (password !== adminPassword) {
+                showNotification('密码错误，请重试', 'error');
+                return;
+            }
+            
+            // Create CSV content
+            let csvContent = "时间,选项,用户ID\n";
+            
+            voteData.records.forEach(record => {
+                csvContent += `${record.time},${record.option},${record.userId}\n`;
+            });
+            
+            // Create download link
+            const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "投票记录_" + new Date().toLocaleDateString() + ".csv");
+            document.body.appendChild(link);
+            
+            // Trigger download
+            link.click();
+            
+            // Clean up
+            document.body.removeChild(link);
+            
+            // Show success notification
+            showNotification('数据导出成功', 'success');
+        });
+        
+        // Update chart
+        function updateChart() {
+            const total = voteData.urban + voteData.rural + voteData.other;
+            
+            // Calculate percentages
+            const urbanPercent = total > 0 ? (voteData.urban / total) * 100 : 0;
+            const ruralPercent = total > 0 ? (voteData.rural / total) * 100 : 0;
+            const otherPercent = total > 0 ? (voteData.other / total) * 100 : 0;
+            
+            // Update bars
+            document.getElementById('urbanBar').style.height = `${urbanPercent}%`;
+            document.getElementById('ruralBar').style.height = `${ruralPercent}%`;
+            document.getElementById('otherBar').style.height = `${otherPercent}%`;
+            
+            // Update counts
+            document.getElementById('urbanCount').textContent = `${voteData.urban}票 (${urbanPercent.toFixed(1)}%)`;
+            document.getElementById('ruralCount').textContent = `${voteData.rural}票 (${ruralPercent.toFixed(1)}%)`;
+            document.getElementById('otherCount').textContent = `${voteData.other}票 (${otherPercent.toFixed(1)}%)`;
+            
+            // Update total
+            document.getElementById('totalVotes').textContent = total;
+        }
+        
+        // Update vote records table
+        function updateVoteRecords() {
+            const recordsTable = document.getElementById('voteRecords');
+            recordsTable.innerHTML = '';
+            
+            if (voteData.records.length === 0) {
+                recordsTable.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-secondary-600">暂无投票记录</td></tr>';
+                return;
+            }
+            
+            // Show last 10 records (most recent first)
+            const recentRecords = [...voteData.records].reverse().slice(0, 10);
+            
+            recentRecords.forEach(record => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-secondary-100';
+                row.innerHTML = `
+                    <td class="py-2 px-4 text-secondary-600">${record.time}</td>
+                    <td class="py-2 px-4 text-secondary-600">${record.option}</td>
+                    <td class="py-2 px-4 text-secondary-600">${record.userId}</td>
+                `;
+                recordsTable.appendChild(row);
+            });
+        }
+        
+        // Show notification
+        function showNotification(message, type) {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            
+            let bgColor, icon;
+            switch (type) {
+                case 'success':
+                    bgColor = 'bg-green-500';
+                    icon = 'fa-check-circle';
+                    break;
+                case 'error':
+                    bgColor = 'bg-red-500';
+                    icon = 'fa-exclamation-circle';
+                    break;
+                case 'info':
+                    bgColor = 'bg-blue-500';
+                    icon = 'fa-info-circle';
+                    break;
+                default:
+                    bgColor = 'bg-secondary-500';
+                    icon = 'fa-bell';
+            }
+            
+            notification.className = `notification ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg mb-2 flex items-center`;
+            notification.innerHTML = `
+                <i class="fas ${icon} mr-2"></i>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(-10px)';
+                notification.style.transition = 'all 0.3s ease';
+                
+                setTimeout(() => {
+                    container.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+        
+        // Get option name
+        function getOptionName(option) {
+            switch (option) {
+                case 'urban':
+                    return '城市写字楼';
+                case 'rural':
+                    return '基层农村';
+                case 'other':
+                    return '其他领域';
+                default:
+                    return '未知选项';
+            }
+        }
+        
+        // Generate random user ID
+        function generateUserId() {
+            return 'user_' + Math.random().toString(36).substr(2, 9);
+        }
+    </script>
+</body>
+</html>
