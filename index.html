@@ -251,11 +251,16 @@
             .stat-number { font-size: 1.7rem; }
             .vote-btn { width: 90%; }
         }
+        .detected-ip {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #10b981;
+        }
     </style>
 </head>
 <body>
 <div id="app">
-    <!-- 首页视图：二维码 + 教师入口 + 网络配置 -->
+    <!-- 首页视图：二维码 + 教师入口 + 智能网络配置 -->
     <div id="homeView" class="container" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div class="card" style="width: 100%; max-width: 620px;">
             <div class="card-header" style="text-align: center;">🗳️ 互动投票系统</div>
@@ -266,15 +271,16 @@
                     <label>🌐 当前访问地址：</label>
                     <div style="font-family: monospace; background:#fff; padding:6px 10px; border-radius: 40px; margin-top: 6px; font-size:0.85rem; word-break:break-all;" id="currentAccessUrl"></div>
                     <div style="margin-top: 12px;">
-                        <label>📡 如需手机扫码，请确保手机能访问此地址：</label>
+                        <label>📡 手机扫码请确保手机能访问此地址：</label>
                         <div class="ip-input-group">
                             <input type="text" id="customIpInput" placeholder="例如 192.168.1.100 或 yourdomain.com" value="">
                             <button id="updateQrBtn">更新二维码</button>
                         </div>
                         <div style="margin-top: 8px;">
                             <button id="copyStudentLinkBtn" class="copy-link-btn">📋 复制学生投票链接</button>
-                            <button id="autoDetectIpBtn" class="copy-link-btn" style="margin-left: 8px;">🔄 自动检测IP</button>
+                            <button id="autoDetectIpBtn" class="copy-link-btn" style="margin-left: 8px;">🔄 自动检测局域网IP</button>
                         </div>
+                        <div id="detectedIpInfo" class="detected-ip"></div>
                         <div class="footer-note" style="margin-top: 10px; font-size:0.75rem;">💡 部署后请使用实际域名或IP，二维码将自动适配</div>
                     </div>
                 </div>
@@ -335,7 +341,7 @@
 </div>
 
 <script>
-    // ---------- 前端核心 (扫码优化 + 灵活地址) ----------
+    // ---------- 前端核心 (扫码优化 + 智能IP检测) ----------
     const BASE_URL = window.location.origin;
     let socket = null;
     let currentView = 'home';
@@ -390,6 +396,8 @@
             document.getElementById('qrTipText') && (document.getElementById('qrTipText').innerHTML = `📱 扫码进入投票 (${studentUrl})`);
             const copyBtn = document.getElementById('copyStudentLinkBtn');
             if(copyBtn) copyBtn.setAttribute('data-link', studentUrl);
+            // 更新显示地址
+            document.getElementById('currentAccessUrl').innerText = studentUrl;
         } catch(e) {
             console.warn("QR生成失败", e);
             container.innerHTML = '<div style="padding:20px;">二维码生成失败，请手动复制链接</div>';
@@ -399,24 +407,76 @@
     function refreshQrWithIp(ipValue) {
         let finalHost = ipValue.trim();
         if (!finalHost) finalHost = window.location.host;
-        // 保留端口
+        // 保留端口（如果用户没输入端口但当前页面有端口且不是默认端口，则追加）
         if (finalHost.indexOf(':') === -1 && window.location.port && window.location.port !== '80' && window.location.port !== '443') {
             finalHost = finalHost + ':' + window.location.port;
         }
         generateQRCodeWithHost(finalHost);
-        document.getElementById('currentAccessUrl').innerText = getStudentVoteUrl(finalHost);
     }
 
-    function autoDetectLocalIp() {
-        const currentHostname = window.location.hostname;
-        if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
-            document.getElementById('customIpInput').value = currentHostname;
-            refreshQrWithIp(currentHostname);
-            showToast(`已使用当前地址 ${currentHostname} 生成二维码`);
-        } else {
-            showToast("请手动输入服务器的公网IP或域名", 3000);
-            document.getElementById('customIpInput').placeholder = "例如 123.123.123.123 或 example.com";
-        }
+    // 通过 WebRTC 获取局域网 IP (更可靠的自动检测)
+    function getLocalIPs(callback) {
+        const ips = [];
+        const pc = new RTCPeerConnection({ iceServers: [] });
+        pc.createDataChannel('');
+        pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .catch(e => console.warn("WebRTC failed", e));
+        pc.onicecandidate = (event) => {
+            if (!event || !event.candidate) return;
+            const candidate = event.candidate.candidate;
+            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const match = candidate.match(ipRegex);
+            if (match && !ips.includes(match[0]) && !match[0].startsWith('192.168.') && !match[0].startsWith('10.') && !match[0].startsWith('172.')) {
+                // 忽略公网，优先局域网
+            } else if (match && !ips.includes(match[0])) {
+                ips.push(match[0]);
+            }
+        };
+        pc.onicecandidate = (event) => {
+            if (!event || !event.candidate) {
+                // 收集完成
+                const localIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) || ips[0];
+                callback(localIp || null);
+                pc.close();
+                return;
+            }
+            const candidate = event.candidate.candidate;
+            const ipRegex = /([0-9]{1,3}\.){3}[0-9]{1,3}/;
+            const match = candidate.match(ipRegex);
+            if (match && !ips.includes(match[0])) {
+                ips.push(match[0]);
+            }
+        };
+        setTimeout(() => {
+            const localIp = ips.find(ip => ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) || ips[0];
+            callback(localIp || null);
+            pc.close();
+        }, 2000);
+    }
+
+    async function autoDetectAndSetIp() {
+        showToast("正在检测本机局域网IP...", 1500);
+        getLocalIPs((localIp) => {
+            if (localIp) {
+                document.getElementById('customIpInput').value = localIp;
+                refreshQrWithIp(localIp);
+                document.getElementById('detectedIpInfo').innerHTML = `✅ 检测到局域网IP: ${localIp}，已自动填入并更新二维码`;
+                showToast(`已设置IP: ${localIp}，手机请连接同一WiFi扫码`);
+            } else {
+                // 降级：尝试从当前页面 hostname 中提取
+                const currentHost = window.location.hostname;
+                if (currentHost && currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+                    document.getElementById('customIpInput').value = currentHost;
+                    refreshQrWithIp(currentHost);
+                    document.getElementById('detectedIpInfo').innerHTML = `⚠️ 未能自动检测局域网IP，已使用当前地址: ${currentHost}`;
+                    showToast(`使用当前地址: ${currentHost}`);
+                } else {
+                    document.getElementById('detectedIpInfo').innerHTML = `❌ 无法自动检测IP，请手动输入服务器的局域网IP或域名`;
+                    showToast("请手动输入服务器IP地址", 3000);
+                }
+            }
+        });
     }
 
     function initSocketConnection() {
@@ -446,7 +506,12 @@
         if (view === 'home') {
             document.getElementById('homeView').style.display = 'flex';
             currentView = 'home';
-            refreshQrWithIp(window.location.host);
+            // 默认使用当前host生成二维码，但如果有检测IP的尝试则保留
+            if (!document.getElementById('customIpInput').value.trim()) {
+                refreshQrWithIp(window.location.host);
+            } else {
+                refreshQrWithIp(document.getElementById('customIpInput').value);
+            }
             if (statsInterval) clearInterval(statsInterval);
         } else if (view === 'student') {
             document.getElementById('studentView').style.display = 'block';
@@ -584,9 +649,10 @@
         if (!customIp) customIp = window.location.host;
         refreshQrWithIp(customIp);
         showToast(`二维码已更新，地址: ${getStudentVoteUrl(customIp)}`);
+        document.getElementById('detectedIpInfo').innerHTML = `✅ 已手动设置为: ${customIp}`;
     });
     document.getElementById('copyStudentLinkBtn')?.addEventListener('click', copyStudentLink);
-    document.getElementById('autoDetectIpBtn')?.addEventListener('click', autoDetectLocalIp);
+    document.getElementById('autoDetectIpBtn')?.addEventListener('click', autoDetectAndSetIp);
 
     function handleRouting() {
         const params = new URLSearchParams(window.location.search);
@@ -599,6 +665,13 @@
     handleRouting();
     window.addEventListener('beforeunload', () => { if (statsInterval) clearInterval(statsInterval); });
     initSocketConnection();
+
+    // 页面加载后自动尝试检测IP (但不强制覆盖，仅作为辅助)
+    setTimeout(() => {
+        if (currentView === 'home' && !document.getElementById('customIpInput').value) {
+            autoDetectAndSetIp();
+        }
+    }, 500);
 </script>
 </body>
 </html>
