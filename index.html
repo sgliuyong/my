@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>互动投票系统 | 云端实时同步 (腾讯云开发)</title>
+    <title>互动投票系统 | 腾讯云开发实时同步</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
@@ -124,9 +124,9 @@
 </div>
 
 <script>
-    // ========== 请替换为您的腾讯云开发环境ID ==========
-    const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";
-    // ===============================================
+    // ==================== 🔧 请将下面的字符串替换为您的腾讯云开发环境ID ====================
+    const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";   // 例如: "myapp-123abc"
+    // ============================================================================
 
     let app, db, pollDoc;
     let currentView = 'home';
@@ -137,7 +137,7 @@
     let unwatch = null;
     let isLoggedIn = false;
     let loginPromise = null;
-    let pollingInterval = null;  // 轮询定时器
+    let pollingInterval = null;
 
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
@@ -153,11 +153,15 @@
         return '其他领域';
     }
 
-    // 初始化云开发
+    // 初始化云开发（温和检查环境ID）
     async function initCloudBase() {
+        // 检查是否修改了环境ID（不能是默认的 "YOUR_ENV_ID_HERE" 或空）
         if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "vote-system-d1g3vx03wbaef4313") {
-            alert("请先修改代码中的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID");
-            throw new Error("未配置环境ID");
+            const msg = "❌ 请先修改代码开头的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID！";
+            console.error(msg);
+            document.getElementById('permissionTip') && (document.getElementById('permissionTip').innerHTML = msg, document.getElementById('permissionTip').style.display = 'block');
+            showToast(msg, 8000);
+            throw new Error(msg);
         }
         app = cloudbase.init({ env: CLOUDBASE_ENV_ID });
         const auth = app.auth();
@@ -179,7 +183,7 @@
             return true;
         }).catch(err => {
             console.error("登录失败", err);
-            showToast("云开发初始化失败", 5000);
+            showToast("云开发初始化失败，请检查环境ID、匿名登录开关及网络", 5000);
             throw err;
         });
         await loginPromise;
@@ -421,7 +425,6 @@
             const stats = await fetchStatsOnce();
             if (stats) updateTeacherUI(stats);
             else showToast("无法获取数据，请检查权限", 3000);
-            // 启动双重更新：watch + 轮询
             startTeacherRealtime();
             startPolling();
         }
