@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>实时互动投票系统 | 跨设备同步 (WebSocket 驱动)</title>
-    <!-- ECharts & QRCode & Socket.IO (客户端) -->
+    <title>阿里云风格互动投票系统 | 跨设备实时同步 (Firebase驱动)</title>
+    <!-- ECharts & QRCode 库 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
+    <!-- Firebase SDK (实时数据库) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -286,15 +288,13 @@
             color: #0f172a;
             line-height: 1.2;
         }
-        .student-live-tip {
-            background: #eef2ff;
-            border-radius: 40px;
-            padding: 8px 20px;
-            text-align: center;
+        .firebase-warning {
+            background: #fff3e0;
+            border-left: 5px solid #f97316;
+            padding: 14px;
+            border-radius: 20px;
             margin-bottom: 20px;
             font-size: 0.85rem;
-            font-weight: 500;
-            color: #0052cc;
         }
     </style>
 </head>
@@ -303,17 +303,17 @@
     <!-- 首页视图：二维码 + 教师入口 + 智能网络配置 -->
     <div id="homeView" class="container" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div class="card" style="width: 100%; max-width: 620px;">
-            <div class="card-header" style="text-align: center;">🗳️ 实时投票系统 · 跨设备同步</div>
+            <div class="card-header" style="text-align: center;">🗳️ 互动投票系统 · 跨设备同步</div>
             <div class="card-body qr-wrapper">
                 <div id="qrcode"></div>
-                <div class="qr-tip" id="qrTipText">📱 学生扫码参与 · 所有设备实时同步</div>
+                <div class="qr-tip" id="qrTipText">📱 学生扫码参与 · 实时云端同步</div>
                 <div class="network-panel">
                     <label>🌐 当前访问地址：</label>
                     <div style="font-family: monospace; background:#fff; padding:6px 10px; border-radius: 40px; margin-top: 6px; font-size:0.85rem; word-break:break-all;" id="currentAccessUrl"></div>
                     <div style="margin-top: 12px;">
                         <label>📡 手机扫码请确保手机能访问此地址：</label>
                         <div class="ip-input-group">
-                            <input type="text" id="customIpInput" placeholder="例如 192.168.1.100 或 yourdomain.com" value="">
+                            <input type="text" id="customIpInput" placeholder="例如 192.168.1.100 或 sgliuyong.github.io" value="">
                             <button id="updateQrBtn">更新二维码</button>
                         </div>
                         <div style="margin-top: 8px;">
@@ -321,11 +321,11 @@
                             <button id="autoDetectIpBtn" class="copy-link-btn" style="margin-left: 8px;">🔄 自动检测局域网IP</button>
                         </div>
                         <div id="detectedIpInfo" class="detected-ip"></div>
-                        <div class="footer-note" style="margin-top: 10px; font-size:0.75rem;">💡 部署后请使用实际IP，所有设备连接同一服务器即可实时同步</div>
+                        <div class="footer-note" style="margin-top: 10px; font-size:0.75rem;">💡 数据实时云端存储 | 所有设备共享投票结果</div>
                     </div>
                 </div>
                 <button id="teacherEnterBtn" class="btn-teacher">👩‍🏫 教师进入后台</button>
-                <div class="footer-note">⚡ WebSocket实时同步 | 跨手机/电脑投票即刻更新</div>
+                <div class="footer-note">🔥 Firebase 实时同步 | 任何设备投票即刻更新 | 支持覆盖投票</div>
             </div>
         </div>
     </div>
@@ -334,9 +334,9 @@
     <div id="studentView" style="display: none;">
         <div class="container">
             <div class="card">
-                <div class="card-header">✨ 选择你关注的领域 · 投票实时生效</div>
+                <div class="card-header">✨ 选择你关注的领域 (云端实时投票)</div>
                 <div class="card-body">
-                    <div id="studentLiveStats" class="student-live-tip">📊 实时总票数: 0 | 参与设备: 0</div>
+                    <div id="studentNetworkAlert" style="display: none; background: #fee2e2; color:#b91c1c; padding:12px; border-radius:20px; margin-bottom:20px; text-align:center;">⚠️ 网络连接稳定，投票实时生效</div>
                     <div class="options-grid" id="optionsGrid">
                         <div class="option-card" data-value="city">
                             <img class="option-img" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&h=300&fit=crop" alt="城市写字楼" onerror="this.src='https://picsum.photos/id/104/400/200'">
@@ -352,7 +352,7 @@
                         </div>
                     </div>
                     <button id="submitVoteBtn" class="vote-btn">🗳️ 立即投票</button>
-                    <div class="footer-note">💡 可再次投票覆盖原有选择 · 教师后台实时显示最新占比</div>
+                    <div class="footer-note">💡 可再次投票覆盖原有选择 · 数据云端存储 · 教师端实时同步</div>
                 </div>
             </div>
         </div>
@@ -377,7 +377,7 @@
                     <div style="display: flex; justify-content: center; gap: 16px; margin-top: 16px;">
                         <button id="manualRefreshBtn" class="refresh-btn">🔄 手动刷新数据</button>
                     </div>
-                    <div class="footer-note">📡 任何设备投票，教师端实时刷新 | 基于 WebSocket 全局同步</div>
+                    <div class="footer-note">📡 Firebase实时同步 | 所有设备投票教师端即刻更新 | 云端存储</div>
                 </div>
             </div>
         </div>
@@ -385,17 +385,33 @@
 </div>
 
 <script>
-    // ---------- 跨设备实时投票系统 (WebSocket + Node后端) ----------
+    // ======================= 🔥 Firebase 配置 (请替换成您自己的Firebase项目配置) =======================
+    // 如何获取配置: 访问 https://console.firebase.google.com/ 创建项目 → 添加Web应用 → 复制 firebaseConfig
+    // 重要: 启用实时数据库 (Realtime Database) 并设置规则为 { "rules": { ".read": true, ".write": true } } (开发测试用)
+    // 正式环境建议增加校验，但课堂投票足够。
+    const FIREBASE_CONFIG = {
+        apiKey: "请替换为您的API_KEY",          // 例如: "AIzaSyD-xxxxxxxxxxxxx"
+        authDomain: "您的项目ID.firebaseapp.com",
+        databaseURL: "https://您的项目ID-default-rtdb.firebaseio.com",
+        projectId: "您的项目ID",
+        storageBucket: "您的项目ID.appspot.com",
+        messagingSenderId: "1234567890",
+        appId: "1:1234567890:web:xxxxxx"
+    };
+    // ========================================================================================
+    
     // 全局变量
-    let socket = null;
-    let currentView = 'home';      // home, student, teacher
-    let selectedOption = null;     // 学生端当前选中选项
+    let db = null;
+    let pollDataRef = null;
+    let currentView = 'home';
+    let selectedOption = null;
     let deviceId = localStorage.getItem('vote_device_id');
     if (!deviceId) {
         deviceId = 'device_' + Math.random().toString(36).substring(2, 12) + Date.now();
         localStorage.setItem('vote_device_id', deviceId);
     }
     let barChart = null;
+    let teacherUnsubscribe = null;  // 用于解除firebase监听
     
     // 辅助函数
     function showToast(msg, duration = 2600) {
@@ -416,124 +432,130 @@
         return '其他领域';
     }
     
-    // 获取服务器基础URL (同源)
-    const SERVER_BASE = window.location.origin;
-    
-    // 初始化socket连接
-    function initSocketAndSync() {
-        if (socket && socket.connected) return;
-        socket = io(SERVER_BASE, { transports: ['websocket', 'polling'], reconnection: true });
-        
-        socket.on('connect', () => {
-            console.log('WebSocket 已连接，设备ID:', deviceId);
-            // 注册设备，让服务器知道当前设备ID
-            socket.emit('register-device', deviceId);
-        });
-        
-        // 接收初始统计和设备已有投票（用于学生端高亮）
-        socket.on('init-stats', (data) => {
-            const { stats, deviceVote, totalVotes, uniqueDevices } = data;
-            if (currentView === 'teacher') {
-                updateTeacherUI(stats, totalVotes, uniqueDevices);
-            } else if (currentView === 'student') {
-                // 更新学生端实时小统计
-                updateStudentLiveStats(totalVotes, uniqueDevices);
-                // 高亮已有投票选项
-                if (deviceVote && deviceVote.option) {
-                    selectedOption = deviceVote.option;
-                    document.querySelectorAll('.option-card').forEach(card => {
-                        if (card.getAttribute('data-value') === deviceVote.option) {
-                            card.classList.add('selected');
-                        } else {
-                            card.classList.remove('selected');
-                        }
-                    });
-                    showToast(`您上次投票给了“${getOptionText(deviceVote.option)}”，可再次更改`, 2000);
-                } else {
-                    // 清除高亮
-                    document.querySelectorAll('.option-card').forEach(card => card.classList.remove('selected'));
-                    selectedOption = null;
+    // 初始化 Firebase
+    function initFirebase() {
+        if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === "请替换为您的API_KEY") {
+            const warnDiv = document.createElement('div');
+            warnDiv.className = 'firebase-warning';
+            warnDiv.innerHTML = '⚠️ 请先配置 Firebase！在代码顶部 FIREBASE_CONFIG 中填入您自己的 Firebase 项目配置。<br>👉 教程：<a href="https://firebase.google.com/" target="_blank">创建项目</a> → 启用 Realtime Database → 将规则设为 read/write true。';
+            document.querySelector('#homeView .card-body').prepend(warnDiv);
+            console.error('Firebase未配置，投票将不可用');
+            return false;
+        }
+        try {
+            firebase.initializeApp(FIREBASE_CONFIG);
+            db = firebase.database();
+            pollDataRef = db.ref('/pollData');
+            // 初始化数据结构: 如果不存在则创建默认值
+            pollDataRef.transaction(current => {
+                if (current === null) {
+                    return {
+                        votes: { city: 0, rural: 0, other: 0 },
+                        deviceVotes: {},
+                        deviceCount: 0
+                    };
                 }
-            }
-        });
-        
-        // 实时投票更新广播 (任何设备投票后触发)
-        socket.on('stats-update', (payload) => {
-            const { stats, totalVotes, uniqueDevices } = payload;
-            if (currentView === 'teacher') {
-                updateTeacherUI(stats, totalVotes, uniqueDevices);
-            } else if (currentView === 'student') {
-                updateStudentLiveStats(totalVotes, uniqueDevices);
-                // 可选轻提示（非强制）
-                // 安静更新，不打扰用户
-            }
-            // 如果在home页面不需要更新UI，但保持数据一致没影响
-        });
-        
-        // 投票结果确认（用于覆盖投票时弹出结果）
-        socket.on('vote-response', (response) => {
-            if (response.success) {
-                showToast(`✅ 投票成功！支持“${getOptionText(response.option)}”`, 2000);
-                // 如果当前是学生视图，更新选中状态已经在本地做了，无需额外动作
-                if (currentView === 'student') {
-                    // 确保服务器广播的stats-update会刷新统计数据
-                }
-            } else if (response.alreadyVoted && !response.overrideDone) {
-                // 提示是否覆盖
-                const userConfirm = confirm(`您已投给“${getOptionText(response.currentOption)}”，是否改为“${getOptionText(response.requestedOption)}”？`);
-                if (userConfirm) {
-                    socket.emit('cast-vote', { deviceId, option: response.requestedOption, override: true });
-                } else {
-                    showToast("未更改投票", 1500);
-                }
-            } else if (response.needOverride) {
-                // 兼容旧逻辑，直接调用覆盖确认
-                const userConfirm = confirm(`您已投过票，是否改为“${getOptionText(response.requestedOption)}”？`);
-                if (userConfirm) {
-                    socket.emit('cast-vote', { deviceId, option: response.requestedOption, override: true });
-                } else {
-                    showToast("投票未更改", 1500);
-                }
-            } else {
-                showToast(response.message || "投票失败，请重试", 2000);
-            }
-        });
-        
-        socket.on('connect_error', (err) => {
-            console.warn('WebSocket连接错误，请确保后端服务已启动', err);
-            showToast("⚠️ 连接服务器失败，请检查网络或后端服务", 4000);
-        });
-        
-        socket.on('disconnect', () => {
-            console.log('WebSocket断开');
-        });
-    }
-    
-    // 教师视图更新图表+统计
-    function updateTeacherUI(stats, totalVotes, uniqueDevices) {
-        const city = stats.city || 0;
-        const rural = stats.rural || 0;
-        const other = stats.other || 0;
-        document.getElementById('cityCount').innerText = city;
-        document.getElementById('ruralCount').innerText = rural;
-        document.getElementById('otherCount').innerText = other;
-        document.getElementById('totalVotesCount').innerText = totalVotes;
-        document.getElementById('uniqueDevicesCount').innerText = uniqueDevices;
-        if (barChart) {
-            barChart.setOption({
-                series: [{ data: [city, rural, other] }]
+                return current;
             });
-        } else {
-            initTeacherChart();
-            if (barChart) barChart.setOption({ series: [{ data: [city, rural, other] }] });
+            return true;
+        } catch (e) {
+            console.error("Firebase初始化失败", e);
+            showToast("Firebase 配置错误，请检查配置", 5000);
+            return false;
         }
     }
     
-    function updateStudentLiveStats(totalVotes, uniqueDevices) {
-        const liveDiv = document.getElementById('studentLiveStats');
-        if (liveDiv) {
-            liveDiv.innerHTML = `📊 实时总票数: ${totalVotes} | 参与设备: ${uniqueDevices}`;
+    // 核心投票逻辑：使用transaction保证云端原子更新 (支持覆盖旧选项)
+    async function castVote(deviceId, newOption) {
+        if (!pollDataRef) throw new Error("数据库未初始化");
+        return new Promise((resolve, reject) => {
+            pollDataRef.transaction(currentData => {
+                if (currentData === null) {
+                    currentData = { votes: { city: 0, rural: 0, other: 0 }, deviceVotes: {}, deviceCount: 0 };
+                }
+                const oldOption = currentData.deviceVotes[deviceId];
+                // 如果投票相同，直接返回不修改
+                if (oldOption === newOption) {
+                    return; // 无变更，事务中止
+                }
+                // 减少旧选项票数
+                if (oldOption && currentData.votes[oldOption] !== undefined) {
+                    currentData.votes[oldOption] = Math.max(0, currentData.votes[oldOption] - 1);
+                }
+                // 增加新选项票数
+                if (currentData.votes[newOption] !== undefined) {
+                    currentData.votes[newOption] = (currentData.votes[newOption] || 0) + 1;
+                } else {
+                    currentData.votes[newOption] = 1;
+                }
+                // 更新设备投票记录
+                const isNewDevice = !oldOption;
+                currentData.deviceVotes[deviceId] = newOption;
+                // 如果该设备之前没有投过票，设备数+1
+                if (isNewDevice) {
+                    currentData.deviceCount = (currentData.deviceCount || 0) + 1;
+                }
+                return currentData;
+            }, (error, committed, snapshot) => {
+                if (error) {
+                    reject(error);
+                } else if (committed) {
+                    resolve({ success: true, option: newOption });
+                } else {
+                    // 事务未提交通常是因为数据相同没有变更
+                    resolve({ success: true, unchanged: true, option: newOption });
+                }
+            });
+        });
+    }
+    
+    // 获取当前设备已投票的选项 (用于学生界面显示)
+    async function fetchMyVote(deviceId) {
+        if (!pollDataRef) return null;
+        const snapshot = await pollDataRef.once('value');
+        const data = snapshot.val();
+        if (data && data.deviceVotes && data.deviceVotes[deviceId]) {
+            return data.deviceVotes[deviceId];
         }
+        return null;
+    }
+    
+    // 获取全量统计数据 (一次性)
+    async function fetchStatsOnce() {
+        if (!pollDataRef) return null;
+        const snapshot = await pollDataRef.once('value');
+        const data = snapshot.val();
+        if (!data) return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0 };
+        const votes = data.votes || { city:0, rural:0, other:0 };
+        const deviceCount = data.deviceCount || 0;
+        const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
+        return { votes, deviceCount, totalVotes };
+    }
+    
+    // 教师视图：实时监听数据变化，自动更新UI和图表
+    function startTeacherRealtime() {
+        if (teacherUnsubscribe) teacherUnsubscribe();
+        if (!pollDataRef) return;
+        const callback = (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+            const votes = data.votes || { city:0, rural:0, other:0 };
+            const deviceCount = data.deviceCount || 0;
+            const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
+            // 更新卡片
+            document.getElementById('cityCount').innerText = votes.city || 0;
+            document.getElementById('ruralCount').innerText = votes.rural || 0;
+            document.getElementById('otherCount').innerText = votes.other || 0;
+            document.getElementById('totalVotesCount').innerText = totalVotes;
+            document.getElementById('uniqueDevicesCount').innerText = deviceCount;
+            // 更新ECharts
+            if (barChart) {
+                barChart.setOption({
+                    series: [{ data: [votes.city||0, votes.rural||0, votes.other||0] }]
+                });
+            }
+        };
+        teacherUnsubscribe = pollDataRef.on('value', callback);
     }
     
     function initTeacherChart() {
@@ -549,19 +571,52 @@
         });
     }
     
-    // 学生端投票提交
-    async function submitVote(optionValue, overrideFlag = false) {
-        if (!optionValue) {
-            showToast("请先选择一个选项");
+    // 学生端：提交投票（带覆盖确认逻辑）
+    async function handleStudentVote(newOption) {
+        try {
+            // 先查询当前用户之前的投票
+            const oldVote = await fetchMyVote(deviceId);
+            if (oldVote && oldVote !== newOption) {
+                const confirmChange = confirm(`您已投票给“${getOptionText(oldVote)}”，是否改为“${getOptionText(newOption)}”？`);
+                if (!confirmChange) {
+                    showToast("未更改投票");
+                    return false;
+                }
+            }
+            // 执行投票事务
+            const result = await castVote(deviceId, newOption);
+            if (result.success) {
+                showToast(`✅ 投票成功！支持“${getOptionText(newOption)}”`);
+                // 更新界面高亮状态
+                selectedOption = newOption;
+                document.querySelectorAll('.option-card').forEach(card => {
+                    if (card.getAttribute('data-value') === newOption) card.classList.add('selected');
+                    else card.classList.remove('selected');
+                });
+                return true;
+            } else {
+                showToast("投票失败，请稍后重试");
+                return false;
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("网络错误，投票失败");
             return false;
         }
-        if (!socket || !socket.connected) {
-            showToast("网络未连接，请稍后再试", 2000);
-            return false;
+    }
+    
+    // 学生视图：加载用户已有的投票并高亮
+    async function loadStudentPreviousVote() {
+        const myVote = await fetchMyVote(deviceId);
+        if (myVote) {
+            selectedOption = myVote;
+            document.querySelectorAll('.option-card').forEach(card => {
+                if (card.getAttribute('data-value') === myVote) card.classList.add('selected');
+            });
+            showToast(`您上次投票给了“${getOptionText(myVote)}”，可再次更改`);
+        } else {
+            selectedOption = null;
         }
-        // 通过socket发送投票请求
-        socket.emit('cast-vote', { deviceId, option: optionValue, override: overrideFlag });
-        return true;
     }
     
     // 学生端UI事件绑定
@@ -577,77 +632,23 @@
             voteBtn.addEventListener('click', voteClickHandler);
         }
     }
-    
     function cardClickHandler(e) {
         const card = e.currentTarget;
         selectedOption = card.getAttribute('data-value');
         document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
     }
-    
     async function voteClickHandler() {
-        if (!selectedOption) {
-            showToast("请先选择一个领域");
-            return;
-        }
-        await submitVote(selectedOption, false);
+        if (!selectedOption) { showToast("请先选择一个领域"); return; }
+        await handleStudentVote(selectedOption);
     }
     
-    // 重置学生端UI高亮 (保留已有投票会通过init-stats还原)
-    function resetStudentUI() {
-        // 高亮将由服务器推送覆盖，无需手动重置全部，但清除本地选中
-        selectedOption = null;
-        // 注意不要直接移除所有高亮，等待init-stats恢复
-    }
-    
-    // 视图切换
-    function showView(view) {
-        document.getElementById('homeView').style.display = 'none';
-        document.getElementById('studentView').style.display = 'none';
-        document.getElementById('teacherView').style.display = 'none';
-        if (view === 'home') {
-            document.getElementById('homeView').style.display = 'flex';
-            currentView = 'home';
-            // 刷新二维码
-            const currentHostInput = document.getElementById('customIpInput');
-            const hostVal = currentHostInput.value.trim() || window.location.host;
-            refreshQrWithIp(hostVal);
-        } else if (view === 'student') {
-            document.getElementById('studentView').style.display = 'block';
-            currentView = 'student';
-            // 确保socket连接
-            if (!socket || !socket.connected) initSocketAndSync();
-            // 重置本地选中，等待服务器返回已有选项
-            selectedOption = null;
-            document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
-            bindStudentEvents();
-            // 请求服务器重新发送init (通过重新注册，服务器会推送init-stats)
-            if (socket && socket.connected) {
-                socket.emit('register-device', deviceId);
-            }
-        } else if (view === 'teacher') {
-            document.getElementById('teacherView').style.display = 'block';
-            currentView = 'teacher';
-            if (!barChart) initTeacherChart();
-            // 请求当前统计
-            if (socket && socket.connected) {
-                socket.emit('request-stats');
-            } else {
-                initSocketAndSync();
-                setTimeout(() => {
-                    if (socket && socket.connected) socket.emit('request-stats');
-                }, 300);
-            }
-        }
-    }
-    
-    // 二维码 & 网络工具 (保持原有的跨设备入口)
+    // ----- 二维码与地址生成 (纯前端展示，适配github pages) -----
     function getStudentVoteUrl(customHost) {
         let host = customHost || window.location.host;
         let protocol = window.location.protocol;
         return `${protocol}//${host}?role=student`;
     }
-    
     function generateQRCodeWithHost(host) {
         const container = document.getElementById('qrcode');
         if (!container) return;
@@ -670,7 +671,6 @@
             container.innerHTML = '<div style="padding:20px;">二维码生成失败，请手动复制链接</div>';
         }
     }
-    
     function refreshQrWithIp(ipValue) {
         let finalHost = ipValue.trim();
         if (!finalHost) finalHost = window.location.host;
@@ -679,7 +679,6 @@
         }
         generateQRCodeWithHost(finalHost);
     }
-    
     function getLocalIPs(callback) {
         const ips = [];
         const pc = new RTCPeerConnection({ iceServers: [] });
@@ -703,7 +702,6 @@
             pc.close();
         }, 2000);
     }
-    
     async function autoDetectAndSetIp() {
         showToast("正在检测本机局域网IP...", 1500);
         getLocalIPs((localIp) => {
@@ -726,14 +724,50 @@
             }
         });
     }
-    
     function copyStudentLink() {
         const link = document.getElementById('copyStudentLinkBtn')?.getAttribute('data-link');
         if (link) navigator.clipboard.writeText(link).then(() => showToast("链接已复制")).catch(() => showToast("复制失败"));
         else showToast("请先生成二维码");
     }
     
-    // 路由处理
+    // 视图切换
+    async function showView(view) {
+        document.getElementById('homeView').style.display = 'none';
+        document.getElementById('studentView').style.display = 'none';
+        document.getElementById('teacherView').style.display = 'none';
+        if (view === 'home') {
+            document.getElementById('homeView').style.display = 'flex';
+            currentView = 'home';
+            if (!document.getElementById('customIpInput').value.trim()) refreshQrWithIp(window.location.host);
+            else refreshQrWithIp(document.getElementById('customIpInput').value);
+            if (teacherUnsubscribe) teacherUnsubscribe();
+        } else if (view === 'student') {
+            document.getElementById('studentView').style.display = 'block';
+            currentView = 'student';
+            // 重置UI
+            selectedOption = null;
+            document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+            await loadStudentPreviousVote();
+            bindStudentEvents();
+        } else if (view === 'teacher') {
+            document.getElementById('teacherView').style.display = 'block';
+            currentView = 'teacher';
+            if (!barChart) initTeacherChart();
+            // 立即刷新一次数据再启动实时监听
+            const stats = await fetchStatsOnce();
+            if (stats) {
+                document.getElementById('cityCount').innerText = stats.votes.city||0;
+                document.getElementById('ruralCount').innerText = stats.votes.rural||0;
+                document.getElementById('otherCount').innerText = stats.votes.other||0;
+                document.getElementById('totalVotesCount').innerText = stats.totalVotes;
+                document.getElementById('uniqueDevicesCount').innerText = stats.deviceCount;
+                if (barChart) barChart.setOption({ series: [{ data: [stats.votes.city||0, stats.votes.rural||0, stats.votes.other||0] }] });
+            }
+            startTeacherRealtime();
+        }
+    }
+    
+    // 路由解析
     function handleRouting() {
         const params = new URLSearchParams(window.location.search);
         const role = params.get('role');
@@ -742,44 +776,48 @@
         else showView('home');
     }
     
-    // 页面初始化事件绑定
-    document.getElementById('teacherEnterBtn')?.addEventListener('click', () => {
-        showView('teacher');
-        window.history.pushState({}, '', '?role=teacher');
-    });
-    document.getElementById('manualRefreshBtn')?.addEventListener('click', () => {
-        if (currentView === 'teacher' && socket && socket.connected) {
-            socket.emit('request-stats');
-            showToast("数据已刷新");
-        } else if (currentView === 'teacher') {
-            initSocketAndSync();
-            setTimeout(() => socket && socket.emit('request-stats'), 200);
-            showToast("尝试重新连接并刷新");
+    // 页面启动
+    window.addEventListener('DOMContentLoaded', async () => {
+        const isFirebaseReady = initFirebase();
+        if (!isFirebaseReady) {
+            // 即使firebase未配置，也能显示首页，但投票功能不可用
+            console.warn("Firebase未正确配置，跨设备同步将失效");
         }
+        // 绑定全局按钮事件
+        document.getElementById('teacherEnterBtn')?.addEventListener('click', () => {
+            showView('teacher');
+            window.history.pushState({}, '', '?role=teacher');
+        });
+        document.getElementById('manualRefreshBtn')?.addEventListener('click', async () => {
+            if (currentView === 'teacher') {
+                const stats = await fetchStatsOnce();
+                if (stats && barChart) {
+                    document.getElementById('cityCount').innerText = stats.votes.city||0;
+                    document.getElementById('ruralCount').innerText = stats.votes.rural||0;
+                    document.getElementById('otherCount').innerText = stats.votes.other||0;
+                    document.getElementById('totalVotesCount').innerText = stats.totalVotes;
+                    document.getElementById('uniqueDevicesCount').innerText = stats.deviceCount;
+                    barChart.setOption({ series: [{ data: [stats.votes.city||0, stats.votes.rural||0, stats.votes.other||0] }] });
+                }
+                showToast("数据已刷新");
+            }
+        });
+        document.getElementById('updateQrBtn')?.addEventListener('click', () => {
+            let customIp = document.getElementById('customIpInput').value.trim();
+            if (!customIp) customIp = window.location.host;
+            refreshQrWithIp(customIp);
+            showToast(`二维码已更新，地址: ${getStudentVoteUrl(customIp)}`);
+            document.getElementById('detectedIpInfo').innerHTML = `✅ 已手动设置为: ${customIp}`;
+        });
+        document.getElementById('copyStudentLinkBtn')?.addEventListener('click', copyStudentLink);
+        document.getElementById('autoDetectIpBtn')?.addEventListener('click', autoDetectAndSetIp);
+        window.addEventListener('popstate', () => handleRouting());
+        handleRouting();
+        // 自动尝试检测局域网IP填充二维码 (延迟)
+        setTimeout(() => {
+            if (currentView === 'home' && !document.getElementById('customIpInput').value) autoDetectAndSetIp();
+        }, 500);
     });
-    document.getElementById('updateQrBtn')?.addEventListener('click', () => {
-        let customIp = document.getElementById('customIpInput').value.trim();
-        if (!customIp) customIp = window.location.host;
-        refreshQrWithIp(customIp);
-        showToast(`二维码已更新，地址: ${getStudentVoteUrl(customIp)}`);
-        document.getElementById('detectedIpInfo').innerHTML = `✅ 已手动设置为: ${customIp}`;
-    });
-    document.getElementById('copyStudentLinkBtn')?.addEventListener('click', copyStudentLink);
-    document.getElementById('autoDetectIpBtn')?.addEventListener('click', autoDetectAndSetIp);
-    
-    window.addEventListener('popstate', () => handleRouting());
-    // 启动路由 & socket 连接(连接会在进入需要视图时再建立，首页仅显示二维码)
-    handleRouting();
-    // 预连接（可选：教师/学生切换时建立）
-    // 如果首页就建立连接便于快速切换
-    if (window.location.search.includes('teacher') || window.location.search.includes('student')) {
-        initSocketAndSync();
-    }
-    // 自动检测IP显示二维码
-    setTimeout(() => {
-        if (currentView === 'home' && !document.getElementById('customIpInput').value) autoDetectAndSetIp();
-        else if (currentView === 'home') refreshQrWithIp(document.getElementById('customIpInput').value || window.location.host);
-    }, 300);
 </script>
 </body>
 </html>
