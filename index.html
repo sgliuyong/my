@@ -396,8 +396,8 @@
     }
     let barChart = null;
     let unwatch = null;
-    let isLoggedIn = false;          // 登录状态标志
-    let loginPromise = null;         // 保证只登录一次
+    let isLoggedIn = false;
+    let loginPromise = null;
 
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
@@ -417,7 +417,7 @@
         return '其他领域';
     }
 
-    // 1. 初始化 + 匿名登录（关键修复）
+    // 初始化 CloudBase + 匿名登录
     async function initCloudBase() {
         if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "您的环境ID") {
             const warnDiv = document.createElement('div');
@@ -429,22 +429,15 @@
         app = cloudbase.init({
             env: CLOUDBASE_ENV_ID
         });
-        // 关键：匿名登录
         const auth = app.auth();
         loginPromise = auth.signInAnonymously().then(() => {
             console.log("匿名登录成功");
             isLoggedIn = true;
             db = app.database();
             pollDoc = db.collection('pollData').doc('main');
-            // 尝试确保文档存在（登录后才能操作数据库）
+            // 确保文档存在（仅当文档不存在时创建）
             return pollDoc.get().catch(async (e) => {
-                if (e.code === 'DATABASE_COLLECTION_NOT_EXIST' || e.message.includes('not exist')) {
-                    // 集合可能不存在，先创建集合？SDK无法直接创建集合，需用户在控制台创建。
-                    // 但我们可以使用 set 尝试写入，如果集合不存在会报错，提示用户手动创建。
-                    throw new Error('数据库集合 pollData 不存在，请先在云开发控制台创建集合 "pollData"，并添加一条记录（文档ID: main）或设置权限所有用户可读写');
-                }
                 if (e.code === 'DOCUMENT_NOT_EXIST') {
-                    // 文档不存在，则创建
                     await pollDoc.set({
                         votes: { city: 0, rural: 0, other: 0 },
                         deviceVotes: {},
@@ -457,7 +450,7 @@
             });
         }).catch(err => {
             console.error("CloudBase 登录失败", err);
-            let errorMsg = "腾讯云开发初始化失败，请检查：\n1. 环境ID是否正确\n2. 是否在控制台开启匿名登录（登录方式→匿名登录）\n3. 安全域名是否已添加当前网页域名";
+            let errorMsg = "腾讯云开发初始化失败，请检查：\n1. 环境ID是否正确\n2. 是否在控制台开启匿名登录\n3. 安全域名是否已添加";
             showToast(errorMsg, 5000);
             throw new Error(errorMsg);
         });
@@ -465,39 +458,25 @@
         return true;
     }
 
-    // 投票核心事务（需要保证已登录）
+    // =============== 核心修改：通过云函数执行投票（替换原来的 castVote） ===============
     async function castVote(deviceId, newOption) {
-        if (!isLoggedIn) {
-            throw new Error("尚未完成登录，请稍后重试");
+        if (!app || !isLoggedIn) throw new Error("未登录或云开发未初始化");
+        try {
+            const res = await app.callFunction({
+                name: 'voteFunction',   // 请确保云函数名称与此一致
+                data: { deviceId, newOption }
+            });
+            if (res.result && res.result.success) {
+                return res.result;
+            } else {
+                throw new Error(res.result?.message || "投票失败");
+            }
+        } catch (err) {
+            console.error("调用云函数失败", err);
+            throw new Error("云函数调用失败：" + err.message);
         }
-        if (!db) throw new Error("数据库未初始化");
-        return await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(pollDoc);
-            let data = doc.data();
-            if (!data) {
-                data = { votes: { city: 0, rural: 0, other: 0 }, deviceVotes: {}, deviceCount: 0 };
-            }
-            const oldOption = data.deviceVotes[deviceId];
-            if (oldOption === newOption) {
-                return { success: true, unchanged: true };
-            }
-            if (oldOption && data.votes[oldOption] !== undefined) {
-                data.votes[oldOption] = Math.max(0, data.votes[oldOption] - 1);
-            }
-            data.votes[newOption] = (data.votes[newOption] || 0) + 1;
-            const isNewDevice = !oldOption;
-            data.deviceVotes[deviceId] = newOption;
-            if (isNewDevice) {
-                data.deviceCount = (data.deviceCount || 0) + 1;
-            }
-            data.updatedAt = new Date();
-            await transaction.update(pollDoc, data);
-            return { success: true, option: newOption };
-        }).catch(err => {
-            console.error("事务失败详情:", err);
-            throw err;
-        });
     }
+    // ====================================================================
 
     async function fetchMyVote(deviceId) {
         if (!db || !isLoggedIn) return null;
@@ -727,7 +706,6 @@
     }
 
     async function showView(view) {
-        // 确保数据库已登录
         if (!isLoggedIn) {
             showToast("系统初始化中，请稍后...", 1500);
             try {
