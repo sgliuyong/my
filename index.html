@@ -155,11 +155,11 @@
 
     // 初始化云开发（温和检查环境ID）
     async function initCloudBase() {
-        // 检查是否修改了环境ID（不能是默认的 "YOUR_ENV_ID_HERE" 或空）
         if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "YOUR_ENV_ID_HERE") {
             const msg = "❌ 请先修改代码开头的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID！";
             console.error(msg);
-            document.getElementById('permissionTip') && (document.getElementById('permissionTip').innerHTML = msg, document.getElementById('permissionTip').style.display = 'block');
+            const tipDiv = document.getElementById('permissionTip');
+            if (tipDiv) { tipDiv.innerHTML = msg; tipDiv.style.display = 'block'; }
             showToast(msg, 8000);
             throw new Error(msg);
         }
@@ -170,14 +170,15 @@
             isLoggedIn = true;
             db = app.database();
             pollDoc = db.collection('pollData').doc('main');
-            // 测试读取
             try {
                 const test = await pollDoc.get();
                 console.log("📄 main文档读取成功", test.data);
-                document.getElementById('permissionTip') && (document.getElementById('permissionTip').style.display = 'none');
+                const tipDiv = document.getElementById('permissionTip');
+                if (tipDiv) tipDiv.style.display = 'none';
             } catch (err) {
                 console.error("❌ 读取main文档失败", err);
-                document.getElementById('permissionTip') && (document.getElementById('permissionTip').style.display = 'block');
+                const tipDiv = document.getElementById('permissionTip');
+                if (tipDiv) { tipDiv.style.display = 'block'; tipDiv.innerHTML = '⚠️ 无法读取 main 文档，请检查：1) pollData 集合权限是否为“所有用户可读”；2) 文档 _id 是否为 "main"；3) 云函数是否已成功创建文档。'; }
                 showToast("无法读取投票数据，请检查数据库权限和 main 文档是否存在", 5000);
             }
             return true;
@@ -197,7 +198,6 @@
         throw new Error(res.result?.message || "投票失败");
     }
 
-    // 获取当前设备投票
     async function fetchMyVote(deviceId) {
         if (!db || !isLoggedIn) return null;
         try {
@@ -206,7 +206,6 @@
         } catch(e) { return null; }
     }
 
-    // 获取统计数据
     async function fetchStatsOnce() {
         if (!db || !isLoggedIn) return null;
         try {
@@ -216,28 +215,66 @@
             const votes = data.votes || { city:0, rural:0, other:0 };
             const deviceCount = data.deviceCount || 0;
             const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
+            console.log("📥 fetchStatsOnce 获取到数据:", { votes, deviceCount, totalVotes });
             return { votes, deviceCount, totalVotes };
         } catch(e) { console.warn(e); return null; }
     }
 
-    // 更新教师端UI
+    // 增强版 UI 更新函数，带元素检查和日志
     function updateTeacherUI(stats) {
-        if (!stats) return;
-        document.getElementById('cityCount').innerText = stats.votes.city || 0;
-        document.getElementById('ruralCount').innerText = stats.votes.rural || 0;
-        document.getElementById('otherCount').innerText = stats.votes.other || 0;
-        document.getElementById('totalVotesCount').innerText = stats.totalVotes;
-        document.getElementById('uniqueDevicesCount').innerText = stats.deviceCount;
-        if (barChart) {
-            barChart.setOption({ series: [{ data: [stats.votes.city||0, stats.votes.rural||0, stats.votes.other||0] }] });
+        if (!stats) {
+            console.warn("updateTeacherUI 收到无效数据");
+            return;
         }
-        console.log("📊 UI已更新", stats);
+        console.log("📊 开始更新教师端 UI，数据:", stats);
+
+        const elements = {
+            cityCount: document.getElementById('cityCount'),
+            ruralCount: document.getElementById('ruralCount'),
+            otherCount: document.getElementById('otherCount'),
+            totalVotesCount: document.getElementById('totalVotesCount'),
+            uniqueDevicesCount: document.getElementById('uniqueDevicesCount')
+        };
+
+        let allFound = true;
+        for (const [id, el] of Object.entries(elements)) {
+            if (!el) {
+                console.error(`❌ 元素 #${id} 不存在于 DOM 中！`);
+                allFound = false;
+            }
+        }
+
+        if (!allFound) {
+            console.error("部分教师端 DOM 元素缺失，请检查 HTML 中的 ID 是否与 JS 匹配");
+            return;
+        }
+
+        elements.cityCount.innerText = stats.votes.city || 0;
+        elements.ruralCount.innerText = stats.votes.rural || 0;
+        elements.otherCount.innerText = stats.votes.other || 0;
+        elements.totalVotesCount.innerText = stats.totalVotes;
+        elements.uniqueDevicesCount.innerText = stats.deviceCount;
+
+        if (barChart) {
+            barChart.setOption({
+                series: [{ data: [stats.votes.city || 0, stats.votes.rural || 0, stats.votes.other || 0] }]
+            });
+        } else {
+            console.warn("barChart 未初始化，尝试重新初始化");
+            initTeacherChart();
+            if (barChart) {
+                barChart.setOption({
+                    series: [{ data: [stats.votes.city || 0, stats.votes.rural || 0, stats.votes.other || 0] }]
+                });
+            }
+        }
+        console.log("✅ 教师端 UI 更新完成");
     }
 
-    // 教师端实时监听 (watch)
+    // 教师端实时监听
     function startTeacherRealtime() {
         if (unwatch) { unwatch(); unwatch = null; }
-        if (!pollDoc || !isLoggedIn) { console.warn("无法启动watch"); return; }
+        if (!pollDoc || !isLoggedIn) { console.warn("无法启动 watch"); return; }
         console.log("📡 建立实时监听 (watch) ...");
         const watcher = pollDoc.watch({
             onChange: (snapshot) => {
@@ -257,7 +294,6 @@
         unwatch = () => watcher.close();
     }
 
-    // 轮询兜底（每3秒）
     function startPolling() {
         if (pollingInterval) clearInterval(pollingInterval);
         pollingInterval = setInterval(async () => {
@@ -273,9 +309,12 @@
         if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
     }
 
-    // 教师端初始化图表
     function initTeacherChart() {
         const dom = document.getElementById('barChart');
+        if (!dom) {
+            console.error("找不到 #barChart 元素，无法初始化图表");
+            return;
+        }
         if (barChart) barChart.dispose();
         barChart = echarts.init(dom);
         barChart.setOption({
@@ -284,9 +323,9 @@
             yAxis: { type: 'value', name: '票数' },
             series: [{ type: 'bar', data: [0,0,0], itemStyle: { borderRadius: [12,12,0,0], color: '#0052cc' }, label: { show: true } }]
         });
+        console.log("📊 图表初始化完成");
     }
 
-    // 学生投票处理
     async function handleStudentVote(newOption) {
         try {
             if (!isLoggedIn) { showToast("系统初始化中"); return false; }
@@ -339,8 +378,10 @@
             if (!selectedOption) { showToast("请先选择一个领域"); return; }
             await handleStudentVote(selectedOption);
         };
-        voteBtn.removeEventListener('click', voteHandler);
-        voteBtn.addEventListener('click', voteHandler);
+        if (voteBtn) {
+            voteBtn.removeEventListener('click', voteHandler);
+            voteBtn.addEventListener('click', voteHandler);
+        }
     }
 
     // ----- 二维码与地址 -----
@@ -352,8 +393,10 @@
         const url = getStudentVoteUrl(host);
         new QRCode(container, { text: url, width: 200, height: 200, colorDark: "#0052cc", correctLevel: QRCode.CorrectLevel.H });
         document.getElementById('qrTipText').innerHTML = `📱 扫码投票 (${url})`;
-        document.getElementById('copyStudentLinkBtn')?.setAttribute('data-link', url);
-        document.getElementById('currentAccessUrl').innerText = url;
+        const copyBtn = document.getElementById('copyStudentLinkBtn');
+        if (copyBtn) copyBtn.setAttribute('data-link', url);
+        const urlDiv = document.getElementById('currentAccessUrl');
+        if (urlDiv) urlDiv.innerText = url;
     }
     function refreshQrWithIp(ip) {
         let finalHost = ip.trim() || window.location.host;
@@ -383,9 +426,11 @@
             if (ip) {
                 document.getElementById('customIpInput').value = ip;
                 refreshQrWithIp(ip);
-                document.getElementById('detectedIpInfo').innerHTML = `✅ 已设置IP: ${ip}`;
+                const infoDiv = document.getElementById('detectedIpInfo');
+                if (infoDiv) infoDiv.innerHTML = `✅ 已设置IP: ${ip}`;
             } else {
-                document.getElementById('detectedIpInfo').innerHTML = `❌ 自动检测失败，请手动输入`;
+                const infoDiv = document.getElementById('detectedIpInfo');
+                if (infoDiv) infoDiv.innerHTML = `❌ 自动检测失败，请手动输入`;
             }
         });
     }
@@ -421,10 +466,13 @@
         } else if (view === 'teacher') {
             document.getElementById('teacherView').style.display = 'block';
             currentView = 'teacher';
-            if (!barChart) initTeacherChart();
+            initTeacherChart();  // 确保图表存在
             const stats = await fetchStatsOnce();
-            if (stats) updateTeacherUI(stats);
-            else showToast("无法获取数据，请检查权限", 3000);
+            if (stats) {
+                updateTeacherUI(stats);
+            } else {
+                showToast("无法获取数据，请检查权限", 3000);
+            }
             startTeacherRealtime();
             startPolling();
         }
@@ -436,6 +484,29 @@
         else if (role === 'teacher') showView('teacher');
         else showView('home');
     }
+
+    // 全局调试函数
+    window.debugTeacherUI = async function() {
+        console.log("=== 教师端调试信息 ===");
+        console.log("当前视图:", currentView);
+        console.log("登录状态:", isLoggedIn);
+        console.log("pollDoc 是否存在:", !!pollDoc);
+        const stats = await fetchStatsOnce();
+        console.log("最新数据:", stats);
+        const elements = {
+            cityCount: document.getElementById('cityCount'),
+            ruralCount: document.getElementById('ruralCount'),
+            otherCount: document.getElementById('otherCount'),
+            totalVotesCount: document.getElementById('totalVotesCount'),
+            uniqueDevicesCount: document.getElementById('uniqueDevicesCount'),
+            barChart: document.getElementById('barChart')
+        };
+        for (const [id, el] of Object.entries(elements)) {
+            console.log(`元素 #${id}:`, el ? "存在" : "缺失");
+        }
+        if (stats) updateTeacherUI(stats);
+        console.log("=== 调试结束 ===");
+    };
 
     window.addEventListener('DOMContentLoaded', async () => {
         await initCloudBase();
