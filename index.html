@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>互动投票系统 | 腾讯云开发实时同步（修复教师端显示）</title>
+    <title>互动投票系统 | 腾讯云开发实时同步（修复数据读取）</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
@@ -98,7 +98,7 @@
         </div>
     </div>
 
-    <!-- 教师端 (增强调试版) -->
+    <!-- 教师端 -->
     <div id="teacherView" style="display: none;">
         <div class="container">
             <div class="card">
@@ -119,11 +119,10 @@
                         <button id="manualRefreshBtn" class="refresh-btn">🔄 手动刷新数据</button>
                         <button id="debugLogBtn" class="refresh-btn">🐞 打印调试信息</button>
                     </div>
-                    <!-- 调试面板：显示原始数据最后更新时间及JSON -->
                     <div class="debug-panel" id="debugDataPanel">
                         💡 调试信息: 等待数据加载...
                     </div>
-                    <div class="footer-note">📡 WebSocket 实时同步 + 轮询兜底 (每3秒) | 若数字未更新请点击「强制重绘」</div>
+                    <div class="footer-note">📡 WebSocket 实时同步 + 轮询兜底 (每3秒) | 已修复数据读取格式兼容性</div>
                 </div>
             </div>
         </div>
@@ -131,11 +130,11 @@
 </div>
 
 <script>
-    // ==================== 🔧 请将下面的字符串替换为您的腾讯云开发环境ID ====================
-    const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";   // 例如: "myapp-123abc"
+    // ==================== 请将下面的字符串替换为您的腾讯云开发环境ID ====================
+    const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";
     // ============================================================================
 
-    let app, db, pollDoc;
+    let app, db, pollCollection;
     let currentView = 'home';
     let selectedOption = null;
     let deviceId = localStorage.getItem('vote_device_id') || ('device_' + Math.random().toString(36).substring(2) + Date.now());
@@ -145,7 +144,7 @@
     let isLoggedIn = false;
     let loginPromise = null;
     let pollingInterval = null;
-    let lastRawData = null;  // 存储最后一次原始数据用于调试
+    let lastRawData = null;
 
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
@@ -161,7 +160,29 @@
         return '其他领域';
     }
 
-    // 初始化云开发（温和检查环境ID）
+    // 核心函数：从数据库返回结果中提取文档数据（兼容数组和对象）
+    function extractDocData(result) {
+        if (!result) return null;
+        // 如果 result 是数组且第一个元素是文档对象
+        if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === 'object') {
+            return result[0];
+        }
+        // 如果 result 本身是文档对象且有 _id 或 votes 字段
+        if (result && typeof result === 'object' && (result._id || result.votes)) {
+            return result;
+        }
+        // 如果 result.data 是数组（云开发某些版本返回格式）
+        if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+            return result.data[0];
+        }
+        // 如果 result.data 是对象
+        if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
+            return result.data;
+        }
+        return null;
+    }
+
+    // 初始化云开发
     async function initCloudBase() {
         if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "YOUR_ENV_ID_HERE") {
             const msg = "❌ 请先修改代码开头的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID！";
@@ -177,10 +198,17 @@
             console.log("✅ 匿名登录成功");
             isLoggedIn = true;
             db = app.database();
-            pollDoc = db.collection('pollData').doc('main');
+            pollCollection = db.collection('pollData');
+            // 尝试获取 main 文档，测试连接
             try {
-                const test = await pollDoc.get();
-                console.log("📄 main文档读取成功", test.data);
+                const test = await pollCollection.doc('main').get();
+                console.log("📄 main文档原始返回:", test);
+                const doc = extractDocData(test);
+                if (doc) {
+                    console.log("✅ 解析后的文档:", doc);
+                } else {
+                    console.warn("⚠️ 无法解析文档，可能需要先通过云函数创建");
+                }
                 const tipDiv = document.getElementById('permissionTip');
                 if (tipDiv) tipDiv.style.display = 'none';
             } catch (err) {
@@ -209,41 +237,43 @@
     async function fetchMyVote(deviceId) {
         if (!db || !isLoggedIn) return null;
         try {
-            const res = await pollDoc.get();
-            return res.data?.deviceVotes?.[deviceId] || null;
+            const res = await pollCollection.doc('main').get();
+            const doc = extractDocData(res);
+            if (!doc) return null;
+            return doc.deviceVotes?.[deviceId] || null;
         } catch(e) { return null; }
     }
 
-    // 增强版 fetchStatsOnce: 保证返回标准化数据并记录原始数据
+    // 增强版 fetchStatsOnce: 兼容多种返回格式
     async function fetchStatsOnce() {
         if (!db || !isLoggedIn) return null;
         try {
-            const res = await pollDoc.get();
-            const data = res.data;
-            lastRawData = data;
-            if (!data || !data.votes) {
-                console.warn("⚠️ 数据库返回数据异常或votes字段缺失", data);
-                // 如果文档不存在，返回默认结构
-                return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0, raw: data };
+            const res = await pollCollection.doc('main').get();
+            console.log("📥 fetchStatsOnce 原始返回:", res);
+            const doc = extractDocData(res);
+            lastRawData = doc;
+            if (!doc || !doc.votes) {
+                console.warn("⚠️ 数据库返回数据异常或votes字段缺失", doc);
+                // 返回默认结构，避免 UI 报错
+                return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0, raw: doc };
             }
-            const votes = data.votes || { city:0, rural:0, other:0 };
-            // 确保 votes 对象包含三个字段
+            const votes = doc.votes || { city:0, rural:0, other:0 };
             const safeVotes = {
                 city: votes.city ?? 0,
                 rural: votes.rural ?? 0,
                 other: votes.other ?? 0
             };
-            const deviceCount = typeof data.deviceCount === 'number' ? data.deviceCount : 0;
-            const totalVotes = (safeVotes.city + safeVotes.rural + safeVotes.other);
-            console.log("📥 fetchStatsOnce 获取到原始数据:", { rawVotes: votes, deviceCount, totalVotes, fullData: data });
-            return { votes: safeVotes, deviceCount, totalVotes, raw: data };
+            const deviceCount = typeof doc.deviceCount === 'number' ? doc.deviceCount : 0;
+            const totalVotes = safeVotes.city + safeVotes.rural + safeVotes.other;
+            console.log("📊 解析后的统计数据:", { safeVotes, deviceCount, totalVotes });
+            return { votes: safeVotes, deviceCount, totalVotes, raw: doc };
         } catch(e) { 
             console.error("fetchStatsOnce 错误", e);
             return null; 
         }
     }
 
-    // 更新教师端UI（增强版：确保元素存在且数据完整）
+    // 更新教师端UI
     function updateTeacherUI(stats) {
         if (!stats) {
             console.warn("updateTeacherUI 收到无效数据");
@@ -251,7 +281,6 @@
         }
         console.log("📊 开始更新教师端 UI，数据:", stats);
         
-        // 更新调试面板
         const debugPanel = document.getElementById('debugDataPanel');
         if (debugPanel && stats.raw) {
             const summary = `📅 最后数据: 城市=${stats.votes.city}, 农村=${stats.votes.rural}, 其他=${stats.votes.other} | 独立设备=${stats.deviceCount} | 总票=${stats.totalVotes}`;
@@ -260,69 +289,60 @@
             debugPanel.innerHTML = `⚠️ 数据解析异常，请手动刷新或检查数据库`;
         }
 
-        // 获取所有需要更新的DOM元素
         const cityEl = document.getElementById('cityCount');
         const ruralEl = document.getElementById('ruralCount');
         const otherEl = document.getElementById('otherCount');
         const totalEl = document.getElementById('totalVotesCount');
         const uniqueEl = document.getElementById('uniqueDevicesCount');
         
-        // 检查元素是否存在并赋值
         if (cityEl) cityEl.innerText = stats.votes.city;
-        else console.error("❌ 找不到 #cityCount 元素");
+        else console.error("❌ 找不到 #cityCount");
         if (ruralEl) ruralEl.innerText = stats.votes.rural;
-        else console.error("❌ 找不到 #ruralCount 元素");
         if (otherEl) otherEl.innerText = stats.votes.other;
-        else console.error("❌ 找不到 #otherCount 元素");
         if (totalEl) totalEl.innerText = stats.totalVotes;
-        else console.error("❌ 找不到 #totalVotesCount 元素");
         if (uniqueEl) uniqueEl.innerText = stats.deviceCount;
-        else console.error("❌ 找不到 #uniqueDevicesCount 元素");
 
-        // 更新 ECharts 图表
-        try {
+        if (barChart) {
+            barChart.setOption({
+                series: [{ data: [stats.votes.city, stats.votes.rural, stats.votes.other] }]
+            });
+        } else {
+            initTeacherChart();
             if (barChart) {
                 barChart.setOption({
                     series: [{ data: [stats.votes.city, stats.votes.rural, stats.votes.other] }]
                 });
-                console.log("📈 图表已更新");
-            } else {
-                console.warn("barChart 未初始化，尝试重新初始化图表");
-                initTeacherChart();
-                if (barChart) {
-                    barChart.setOption({
-                        series: [{ data: [stats.votes.city, stats.votes.rural, stats.votes.other] }]
-                    });
-                } else {
-                    console.error("图表初始化失败，请检查 DOM 元素 #barChart");
-                }
             }
-        } catch (chartErr) {
-            console.error("更新图表时出错:", chartErr);
         }
-        
-        console.log("✅ 教师端 UI 更新完成，当前票数:", stats.votes);
+        console.log("✅ 教师端 UI 更新完成");
     }
 
-    // 教师端实时监听 (watch)
+    // 教师端实时监听 (watch) - 修正数据提取
     function startTeacherRealtime() {
         if (unwatch) { unwatch(); unwatch = null; }
-        if (!pollDoc || !isLoggedIn) { console.warn("无法启动 watch"); return; }
+        if (!pollCollection || !isLoggedIn) { console.warn("无法启动 watch"); return; }
         console.log("📡 建立实时监听 (watch) ...");
-        const watcher = pollDoc.watch({
-            onChange: async (snapshot) => {
-                console.log("🔄 watch 触发 onChange, snapshot.doc:", snapshot.doc);
-                const data = snapshot.doc;
-                if (!data) {
-                    console.warn("watch 收到空文档");
+        const watcher = pollCollection.doc('main').watch({
+            onChange: (snapshot) => {
+                console.log("🔄 watch 触发 onChange, snapshot:", snapshot);
+                // snapshot.doc 可能为 null，需要从 snapshot 中提取文档
+                let doc = snapshot.doc;
+                if (!doc && snapshot.data) doc = snapshot.data;
+                if (!doc) {
+                    console.warn("watch 收到空文档，尝试从 snapshot 其他字段获取", snapshot);
                     return;
                 }
-                // 从完整文档中提取数据并标准化
+                // 兼容可能的数组格式
+                const extracted = extractDocData({ data: doc });
+                const data = extracted || doc;
+                if (!data || !data.votes) {
+                    console.warn("watch 解析后仍无 votes 字段", data);
+                    return;
+                }
                 const votes = data.votes || { city:0, rural:0, other:0 };
                 const deviceCount = data.deviceCount || 0;
                 const totalVotes = (votes.city || 0) + (votes.rural || 0) + (votes.other || 0);
-                const safeStats = { votes: { city: votes.city || 0, rural: votes.rural || 0, other: votes.other || 0 }, deviceCount, totalVotes, raw: data };
-                updateTeacherUI(safeStats);
+                updateTeacherUI({ votes: { city: votes.city||0, rural: votes.rural||0, other: votes.other||0 }, deviceCount, totalVotes, raw: data });
             },
             onError: (err) => {
                 console.error("❌ watch 出错", err);
@@ -337,11 +357,7 @@
         pollingInterval = setInterval(async () => {
             if (currentView === 'teacher') {
                 const stats = await fetchStatsOnce();
-                if (stats) {
-                    updateTeacherUI(stats);
-                } else {
-                    console.warn("轮询获取数据失败");
-                }
+                if (stats) updateTeacherUI(stats);
             }
         }, 3000);
         console.log("⏱️ 轮询已启动 (3秒间隔)");
@@ -351,15 +367,14 @@
         if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
     }
 
-    // 初始化 ECharts 图表 (增加防重复和错误处理)
     function initTeacherChart() {
         const dom = document.getElementById('barChart');
         if (!dom) {
-            console.error("找不到 #barChart 元素，无法初始化图表");
+            console.error("找不到 #barChart 元素");
             return false;
         }
         if (barChart) {
-            try { barChart.dispose(); } catch(e) { console.warn("dispose 出错", e); }
+            try { barChart.dispose(); } catch(e) {}
             barChart = null;
         }
         try {
@@ -370,7 +385,6 @@
                 yAxis: { type: 'value', name: '票数' },
                 series: [{ type: 'bar', data: [0,0,0], itemStyle: { borderRadius: [12,12,0,0], color: '#0052cc' }, label: { show: true } }]
             });
-            console.log("📊 图表初始化完成");
             return true;
         } catch (err) {
             console.error("图表初始化异常", err);
@@ -518,18 +532,10 @@
         } else if (view === 'teacher') {
             document.getElementById('teacherView').style.display = 'block';
             currentView = 'teacher';
-            // 确保图表容器存在并初始化
             initTeacherChart();
-            // 立即获取最新数据并更新UI
             const stats = await fetchStatsOnce();
-            if (stats) {
-                updateTeacherUI(stats);
-            } else {
-                showToast("无法获取数据，请检查权限或网络", 3000);
-                const debugPanel = document.getElementById('debugDataPanel');
-                if (debugPanel) debugPanel.innerHTML = "❌ 无法从数据库获取数据，请检查集合pollData是否存在且main文档有数据";
-            }
-            // 启动实时同步和轮询
+            if (stats) updateTeacherUI(stats);
+            else showToast("无法获取数据，请检查权限", 3000);
             startTeacherRealtime();
             startPolling();
         }
@@ -542,13 +548,10 @@
         else showView('home');
     }
 
-    // 全局调试辅助函数
     window.debugTeacherUI = async function() {
-        console.log("=== 强制调试教师端 ===");
         const stats = await fetchStatsOnce();
-        console.log("最新原始数据:", lastRawData);
+        console.log("强制调试数据:", stats);
         if (stats) updateTeacherUI(stats);
-        else console.error("获取数据失败");
     };
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -562,19 +565,18 @@
                 showToast("手动刷新完成");
             }
         };
-        // 强制重绘按钮（重新初始化图表并强制刷新数据）
         document.getElementById('forceRenderBtn').onclick = async () => {
             if (currentView === 'teacher') {
                 initTeacherChart();
                 const stats = await fetchStatsOnce();
                 if (stats) updateTeacherUI(stats);
-                showToast("强制重绘 & 数据同步完成");
+                showToast("强制重绘完成");
             }
         };
         document.getElementById('debugLogBtn').onclick = async () => {
             const stats = await fetchStatsOnce();
             console.table(stats?.votes);
-            alert(`调试信息: 城市=${stats?.votes.city}, 农村=${stats?.votes.rural}, 其他=${stats?.votes.other}\n独立设备=${stats?.deviceCount}\n原始数据见控制台`);
+            alert(`城市:${stats?.votes.city} 农村:${stats?.votes.rural} 其他:${stats?.votes.other}\n独立设备:${stats?.deviceCount}`);
         };
         document.getElementById('updateQrBtn').onclick = () => refreshQrWithIp(document.getElementById('customIpInput').value);
         document.getElementById('copyStudentLinkBtn').onclick = copyStudentLink;
