@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>互动投票系统 | 腾讯云开发实时同步（最终修复版）</title>
+    <title>互动投票系统 | 腾讯云开发（修复数据更新）</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
@@ -144,7 +144,6 @@
     let isLoggedIn = false;
     let loginPromise = null;
     let pollingInterval = null;
-    let lastRawData = null;
 
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
@@ -229,6 +228,7 @@
     async function castVote(deviceId, newOption) {
         if (!app || !isLoggedIn) throw new Error("未登录");
         const res = await app.callFunction({ name: 'voteFunction', data: { deviceId, newOption } });
+        console.log("云函数返回:", res);
         if (res.result && res.result.success) return res.result;
         throw new Error(res.result?.message || "投票失败");
     }
@@ -243,14 +243,13 @@
         } catch(e) { return null; }
     }
 
-    // 获取最新统计数据（直接处理数组/对象）
+    // 获取最新统计数据
     async function fetchStatsOnce() {
         if (!db || !isLoggedIn) return null;
         try {
             const res = await pollDocRef.get();
             console.log("📥 fetchStatsOnce 原始返回:", res);
             const doc = getDocFromResponse(res);
-            lastRawData = doc;
             if (!doc || !doc.votes) {
                 console.warn("⚠️ 无法从返回结果中提取 votes 字段", { res, doc });
                 return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0, raw: doc };
@@ -313,7 +312,7 @@
         }
     }
 
-    // 教师端实时监听 (watch) - 修复文档提取
+    // 教师端实时监听 (watch)
     function startTeacherRealtime() {
         if (unwatch) { unwatch(); unwatch = null; }
         if (!pollDocRef || !isLoggedIn) { console.warn("无法启动 watch"); return; }
@@ -321,14 +320,12 @@
         const watcher = pollDocRef.watch({
             onChange: (snapshot) => {
                 console.log("🔄 watch 触发 onChange, snapshot:", snapshot);
-                // snapshot.doc 可能为 null，需要从 snapshot 中提取文档
                 let doc = snapshot.doc;
                 if (!doc && snapshot.data) doc = snapshot.data;
                 if (!doc) {
                     console.warn("watch 收到空文档，尝试从 snapshot 其他字段获取", snapshot);
                     return;
                 }
-                // 使用统一的提取函数
                 const extracted = getDocFromResponse({ data: doc });
                 const data = extracted || doc;
                 if (!data || !data.votes) {
@@ -403,9 +400,14 @@
                 document.querySelectorAll('.option-card').forEach(card => {
                     card.classList.toggle('selected', card.getAttribute('data-value') === newOption);
                 });
+                // 投票成功后主动触发一次教师端刷新（如果教师端开着）
+                if (currentView === 'teacher') {
+                    const stats = await fetchStatsOnce();
+                    if (stats) updateTeacherUI(stats);
+                }
                 return true;
             } else {
-                showToast("投票失败");
+                showToast("投票失败: " + (result.message || "未知错误"));
                 return false;
             }
         } catch(err) {
