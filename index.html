@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>阿里云风格互动投票系统 | 跨设备实时同步 (Firebase驱动)</title>
+    <title>阿里云风格互动投票系统 | 跨设备实时同步 (腾讯云开发)</title>
     <!-- ECharts & QRCode 库 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
-    <!-- Firebase SDK (实时数据库) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <!-- 腾讯云开发 JS SDK -->
+    <script src="https://imgcache.qq.com/qcloud/cloudbase-js-sdk/1.7.0/cloudbase.full.js"></script>
     <style>
         * {
             margin: 0;
@@ -288,7 +287,7 @@
             color: #0f172a;
             line-height: 1.2;
         }
-        .firebase-warning {
+        .config-warning {
             background: #fff3e0;
             border-left: 5px solid #f97316;
             padding: 14px;
@@ -300,13 +299,13 @@
 </head>
 <body>
 <div id="app">
-    <!-- 首页视图：二维码 + 教师入口 + 智能网络配置 -->
+    <!-- 首页视图 -->
     <div id="homeView" class="container" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div class="card" style="width: 100%; max-width: 620px;">
-            <div class="card-header" style="text-align: center;">🗳️ 互动投票系统 · 跨设备同步</div>
+            <div class="card-header" style="text-align: center;">🗳️ 互动投票系统 · 云端实时同步</div>
             <div class="card-body qr-wrapper">
                 <div id="qrcode"></div>
-                <div class="qr-tip" id="qrTipText">📱 学生扫码参与 · 实时云端同步</div>
+                <div class="qr-tip" id="qrTipText">📱 学生扫码参与 · 腾讯云驱动实时同步</div>
                 <div class="network-panel">
                     <label>🌐 当前访问地址：</label>
                     <div style="font-family: monospace; background:#fff; padding:6px 10px; border-radius: 40px; margin-top: 6px; font-size:0.85rem; word-break:break-all;" id="currentAccessUrl"></div>
@@ -325,7 +324,7 @@
                     </div>
                 </div>
                 <button id="teacherEnterBtn" class="btn-teacher">👩‍🏫 教师进入后台</button>
-                <div class="footer-note">🔥 Firebase 实时同步 | 任何设备投票即刻更新 | 支持覆盖投票</div>
+                <div class="footer-note">🔥 腾讯云开发实时同步 | 任何设备投票即刻更新 | 支持覆盖投票</div>
             </div>
         </div>
     </div>
@@ -336,7 +335,6 @@
             <div class="card">
                 <div class="card-header">✨ 选择你关注的领域 (云端实时投票)</div>
                 <div class="card-body">
-                    <div id="studentNetworkAlert" style="display: none; background: #fee2e2; color:#b91c1c; padding:12px; border-radius:20px; margin-bottom:20px; text-align:center;">⚠️ 网络连接稳定，投票实时生效</div>
                     <div class="options-grid" id="optionsGrid">
                         <div class="option-card" data-value="city">
                             <img class="option-img" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&h=300&fit=crop" alt="城市写字楼" onerror="this.src='https://picsum.photos/id/104/400/200'">
@@ -377,7 +375,7 @@
                     <div style="display: flex; justify-content: center; gap: 16px; margin-top: 16px;">
                         <button id="manualRefreshBtn" class="refresh-btn">🔄 手动刷新数据</button>
                     </div>
-                    <div class="footer-note">📡 Firebase实时同步 | 所有设备投票教师端即刻更新 | 云端存储</div>
+                    <div class="footer-note">📡 腾讯云开发实时同步 | 所有设备投票教师端即刻更新 | 云端存储</div>
                 </div>
             </div>
         </div>
@@ -385,24 +383,13 @@
 </div>
 
 <script>
-    // ======================= 🔥 Firebase 配置 (请替换成您自己的Firebase项目配置) =======================
-    // 如何获取配置: 访问 https://console.firebase.google.com/ 创建项目 → 添加Web应用 → 复制 firebaseConfig
-    // 重要: 启用实时数据库 (Realtime Database) 并设置规则为 { "rules": { ".read": true, ".write": true } } (开发测试用)
-    // 正式环境建议增加校验，但课堂投票足够。
-    const FIREBASE_CONFIG = {
-        apiKey: "请替换为您的API_KEY",          // 例如: "AIzaSyD-xxxxxxxxxxxxx"
-        authDomain: "您的项目ID.firebaseapp.com",
-        databaseURL: "https://您的项目ID-default-rtdb.firebaseio.com",
-        projectId: "您的项目ID",
-        storageBucket: "您的项目ID.appspot.com",
-        messagingSenderId: "1234567890",
-        appId: "1:1234567890:web:xxxxxx"
-    };
-    // ========================================================================================
-    
-    // 全局变量
+    // ======================= 🧩 腾讯云开发配置（请替换为您的环境ID） =======================
+    const CLOUDBASE_ENV_ID = "您的环境ID";   // 例如: "test-123abc"
+    // ==================================================================================
+
+    let app = null;
     let db = null;
-    let pollDataRef = null;
+    let pollDoc = null;
     let currentView = 'home';
     let selectedOption = null;
     let deviceId = localStorage.getItem('vote_device_id');
@@ -411,9 +398,8 @@
         localStorage.setItem('vote_device_id', deviceId);
     }
     let barChart = null;
-    let teacherUnsubscribe = null;  // 用于解除firebase监听
-    
-    // 辅助函数
+    let unwatch = null;  // 实时监听取消函数
+
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
         if (!toast) {
@@ -425,139 +411,130 @@
         toast.style.opacity = '1';
         setTimeout(() => { toast.style.opacity = '0'; }, duration);
     }
-    
+
     function getOptionText(val) {
         if (val === 'city') return '城市写字楼';
         if (val === 'rural') return '基层农村';
         return '其他领域';
     }
-    
-    // 初始化 Firebase
-    function initFirebase() {
-        if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === "请替换为您的API_KEY") {
+
+    // 初始化 CloudBase
+    async function initCloudBase() {
+        if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "您的环境ID") {
             const warnDiv = document.createElement('div');
-            warnDiv.className = 'firebase-warning';
-            warnDiv.innerHTML = '⚠️ 请先配置 Firebase！在代码顶部 FIREBASE_CONFIG 中填入您自己的 Firebase 项目配置。<br>👉 教程：<a href="https://firebase.google.com/" target="_blank">创建项目</a> → 启用 Realtime Database → 将规则设为 read/write true。';
+            warnDiv.className = 'config-warning';
+            warnDiv.innerHTML = '⚠️ 请先配置 CloudBase！将代码开头的 <code>CLOUDBASE_ENV_ID</code> 替换为您的腾讯云开发环境ID。<br>👉 教程：<a href="https://cloud.tencent.com/product/tcb" target="_blank">开通云开发</a> → 获取环境ID → 添加安全域名（GitHub Pages域名）。';
             document.querySelector('#homeView .card-body').prepend(warnDiv);
-            console.error('Firebase未配置，投票将不可用');
-            return false;
+            throw new Error('未配置 CloudBase 环境ID');
         }
+        app = cloudbase.init({
+            env: CLOUDBASE_ENV_ID
+        });
+        db = app.database();
+        // 确保文档存在（集合名：pollData，文档ID：main）
+        pollDoc = db.collection('pollData').doc('main');
         try {
-            firebase.initializeApp(FIREBASE_CONFIG);
-            db = firebase.database();
-            pollDataRef = db.ref('/pollData');
-            // 初始化数据结构: 如果不存在则创建默认值
-            pollDataRef.transaction(current => {
-                if (current === null) {
-                    return {
-                        votes: { city: 0, rural: 0, other: 0 },
-                        deviceVotes: {},
-                        deviceCount: 0
-                    };
-                }
-                return current;
+            await pollDoc.get();
+        } catch(e) {
+            // 文档不存在则创建默认数据
+            await pollDoc.set({
+                votes: { city: 0, rural: 0, other: 0 },
+                deviceVotes: {},
+                deviceCount: 0,
+                updatedAt: new Date()
             });
-            return true;
-        } catch (e) {
-            console.error("Firebase初始化失败", e);
-            showToast("Firebase 配置错误，请检查配置", 5000);
-            return false;
         }
+        return true;
     }
-    
-    // 核心投票逻辑：使用transaction保证云端原子更新 (支持覆盖旧选项)
+
+    // 投票核心事务（使用 runTransaction 保证原子性，支持覆盖）
     async function castVote(deviceId, newOption) {
-        if (!pollDataRef) throw new Error("数据库未初始化");
-        return new Promise((resolve, reject) => {
-            pollDataRef.transaction(currentData => {
-                if (currentData === null) {
-                    currentData = { votes: { city: 0, rural: 0, other: 0 }, deviceVotes: {}, deviceCount: 0 };
-                }
-                const oldOption = currentData.deviceVotes[deviceId];
-                // 如果投票相同，直接返回不修改
-                if (oldOption === newOption) {
-                    return; // 无变更，事务中止
-                }
-                // 减少旧选项票数
-                if (oldOption && currentData.votes[oldOption] !== undefined) {
-                    currentData.votes[oldOption] = Math.max(0, currentData.votes[oldOption] - 1);
-                }
-                // 增加新选项票数
-                if (currentData.votes[newOption] !== undefined) {
-                    currentData.votes[newOption] = (currentData.votes[newOption] || 0) + 1;
-                } else {
-                    currentData.votes[newOption] = 1;
-                }
-                // 更新设备投票记录
-                const isNewDevice = !oldOption;
-                currentData.deviceVotes[deviceId] = newOption;
-                // 如果该设备之前没有投过票，设备数+1
-                if (isNewDevice) {
-                    currentData.deviceCount = (currentData.deviceCount || 0) + 1;
-                }
-                return currentData;
-            }, (error, committed, snapshot) => {
-                if (error) {
-                    reject(error);
-                } else if (committed) {
-                    resolve({ success: true, option: newOption });
-                } else {
-                    // 事务未提交通常是因为数据相同没有变更
-                    resolve({ success: true, unchanged: true, option: newOption });
-                }
-            });
+        if (!db) throw new Error("数据库未初始化");
+        return await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(pollDoc);
+            let data = doc.data();
+            if (!data) {
+                data = { votes: { city: 0, rural: 0, other: 0 }, deviceVotes: {}, deviceCount: 0 };
+            }
+            const oldOption = data.deviceVotes[deviceId];
+            // 如果相同，无需变更
+            if (oldOption === newOption) {
+                return { success: true, unchanged: true };
+            }
+            // 减少旧票
+            if (oldOption && data.votes[oldOption] !== undefined) {
+                data.votes[oldOption] = Math.max(0, data.votes[oldOption] - 1);
+            }
+            // 增加新票
+            data.votes[newOption] = (data.votes[newOption] || 0) + 1;
+            // 记录设备投票
+            const isNewDevice = !oldOption;
+            data.deviceVotes[deviceId] = newOption;
+            if (isNewDevice) {
+                data.deviceCount = (data.deviceCount || 0) + 1;
+            }
+            data.updatedAt = new Date();
+            await transaction.update(pollDoc, data);
+            return { success: true, option: newOption };
+        }).catch(err => {
+            console.error("事务失败", err);
+            throw err;
         });
     }
-    
-    // 获取当前设备已投票的选项 (用于学生界面显示)
+
+    // 获取当前设备已投票的选项
     async function fetchMyVote(deviceId) {
-        if (!pollDataRef) return null;
-        const snapshot = await pollDataRef.once('value');
-        const data = snapshot.val();
+        if (!db) return null;
+        const res = await pollDoc.get();
+        const data = res.data;
         if (data && data.deviceVotes && data.deviceVotes[deviceId]) {
             return data.deviceVotes[deviceId];
         }
         return null;
     }
-    
-    // 获取全量统计数据 (一次性)
+
+    // 获取全量统计数据（一次）
     async function fetchStatsOnce() {
-        if (!pollDataRef) return null;
-        const snapshot = await pollDataRef.once('value');
-        const data = snapshot.val();
+        if (!db) return null;
+        const res = await pollDoc.get();
+        const data = res.data;
         if (!data) return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0 };
         const votes = data.votes || { city:0, rural:0, other:0 };
         const deviceCount = data.deviceCount || 0;
         const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
         return { votes, deviceCount, totalVotes };
     }
-    
-    // 教师视图：实时监听数据变化，自动更新UI和图表
+
+    // 教师视图：实时监听文档变化 (使用 watch)
     function startTeacherRealtime() {
-        if (teacherUnsubscribe) teacherUnsubscribe();
-        if (!pollDataRef) return;
-        const callback = (snapshot) => {
-            const data = snapshot.val();
-            if (!data) return;
-            const votes = data.votes || { city:0, rural:0, other:0 };
-            const deviceCount = data.deviceCount || 0;
-            const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
-            // 更新卡片
-            document.getElementById('cityCount').innerText = votes.city || 0;
-            document.getElementById('ruralCount').innerText = votes.rural || 0;
-            document.getElementById('otherCount').innerText = votes.other || 0;
-            document.getElementById('totalVotesCount').innerText = totalVotes;
-            document.getElementById('uniqueDevicesCount').innerText = deviceCount;
-            // 更新ECharts
-            if (barChart) {
-                barChart.setOption({
-                    series: [{ data: [votes.city||0, votes.rural||0, votes.other||0] }]
-                });
+        if (unwatch) unwatch();
+        if (!pollDoc) return;
+        const watcher = pollDoc.watch({
+            onChange: (snapshot) => {
+                const data = snapshot.doc;
+                if (!data) return;
+                const votes = data.votes || { city:0, rural:0, other:0 };
+                const deviceCount = data.deviceCount || 0;
+                const totalVotes = (votes.city||0)+(votes.rural||0)+(votes.other||0);
+                document.getElementById('cityCount').innerText = votes.city || 0;
+                document.getElementById('ruralCount').innerText = votes.rural || 0;
+                document.getElementById('otherCount').innerText = votes.other || 0;
+                document.getElementById('totalVotesCount').innerText = totalVotes;
+                document.getElementById('uniqueDevicesCount').innerText = deviceCount;
+                if (barChart) {
+                    barChart.setOption({
+                        series: [{ data: [votes.city||0, votes.rural||0, votes.other||0] }]
+                    });
+                }
+            },
+            onError: (err) => {
+                console.error("监听出错", err);
+                showToast("实时连接中断，将自动重连", 3000);
             }
-        };
-        teacherUnsubscribe = pollDataRef.on('value', callback);
+        });
+        unwatch = () => watcher.close();
     }
-    
+
     function initTeacherChart() {
         const dom = document.getElementById('barChart');
         if (barChart) barChart.dispose();
@@ -570,11 +547,10 @@
             series: [{ data: [0,0,0], type: 'bar', barWidth: '48%', itemStyle: { borderRadius: [12,12,0,0], color: '#0052cc' }, label: { show: true, position: 'top' } }]
         });
     }
-    
-    // 学生端：提交投票（带覆盖确认逻辑）
+
+    // 学生端提交投票
     async function handleStudentVote(newOption) {
         try {
-            // 先查询当前用户之前的投票
             const oldVote = await fetchMyVote(deviceId);
             if (oldVote && oldVote !== newOption) {
                 const confirmChange = confirm(`您已投票给“${getOptionText(oldVote)}”，是否改为“${getOptionText(newOption)}”？`);
@@ -583,11 +559,9 @@
                     return false;
                 }
             }
-            // 执行投票事务
             const result = await castVote(deviceId, newOption);
             if (result.success) {
                 showToast(`✅ 投票成功！支持“${getOptionText(newOption)}”`);
-                // 更新界面高亮状态
                 selectedOption = newOption;
                 document.querySelectorAll('.option-card').forEach(card => {
                     if (card.getAttribute('data-value') === newOption) card.classList.add('selected');
@@ -595,7 +569,7 @@
                 });
                 return true;
             } else {
-                showToast("投票失败，请稍后重试");
+                showToast("投票失败，请重试");
                 return false;
             }
         } catch (err) {
@@ -604,8 +578,7 @@
             return false;
         }
     }
-    
-    // 学生视图：加载用户已有的投票并高亮
+
     async function loadStudentPreviousVote() {
         const myVote = await fetchMyVote(deviceId);
         if (myVote) {
@@ -618,8 +591,7 @@
             selectedOption = null;
         }
     }
-    
-    // 学生端UI事件绑定
+
     function bindStudentEvents() {
         const cards = document.querySelectorAll('.option-card');
         cards.forEach(card => {
@@ -642,8 +614,8 @@
         if (!selectedOption) { showToast("请先选择一个领域"); return; }
         await handleStudentVote(selectedOption);
     }
-    
-    // ----- 二维码与地址生成 (纯前端展示，适配github pages) -----
+
+    // ----- 二维码与地址生成 -----
     function getStudentVoteUrl(customHost) {
         let host = customHost || window.location.host;
         let protocol = window.location.protocol;
@@ -729,7 +701,7 @@
         if (link) navigator.clipboard.writeText(link).then(() => showToast("链接已复制")).catch(() => showToast("复制失败"));
         else showToast("请先生成二维码");
     }
-    
+
     // 视图切换
     async function showView(view) {
         document.getElementById('homeView').style.display = 'none';
@@ -740,11 +712,10 @@
             currentView = 'home';
             if (!document.getElementById('customIpInput').value.trim()) refreshQrWithIp(window.location.host);
             else refreshQrWithIp(document.getElementById('customIpInput').value);
-            if (teacherUnsubscribe) teacherUnsubscribe();
+            if (unwatch) unwatch();
         } else if (view === 'student') {
             document.getElementById('studentView').style.display = 'block';
             currentView = 'student';
-            // 重置UI
             selectedOption = null;
             document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
             await loadStudentPreviousVote();
@@ -753,7 +724,6 @@
             document.getElementById('teacherView').style.display = 'block';
             currentView = 'teacher';
             if (!barChart) initTeacherChart();
-            // 立即刷新一次数据再启动实时监听
             const stats = await fetchStatsOnce();
             if (stats) {
                 document.getElementById('cityCount').innerText = stats.votes.city||0;
@@ -766,8 +736,7 @@
             startTeacherRealtime();
         }
     }
-    
-    // 路由解析
+
     function handleRouting() {
         const params = new URLSearchParams(window.location.search);
         const role = params.get('role');
@@ -775,15 +744,15 @@
         else if (role === 'teacher') showView('teacher');
         else showView('home');
     }
-    
-    // 页面启动
+
+    // 启动
     window.addEventListener('DOMContentLoaded', async () => {
-        const isFirebaseReady = initFirebase();
-        if (!isFirebaseReady) {
-            // 即使firebase未配置，也能显示首页，但投票功能不可用
-            console.warn("Firebase未正确配置，跨设备同步将失效");
+        try {
+            await initCloudBase();
+        } catch(e) {
+            console.error(e);
+            // 未配置时仍然显示界面，但无法投票
         }
-        // 绑定全局按钮事件
         document.getElementById('teacherEnterBtn')?.addEventListener('click', () => {
             showView('teacher');
             window.history.pushState({}, '', '?role=teacher');
@@ -813,7 +782,6 @@
         document.getElementById('autoDetectIpBtn')?.addEventListener('click', autoDetectAndSetIp);
         window.addEventListener('popstate', () => handleRouting());
         handleRouting();
-        // 自动尝试检测局域网IP填充二维码 (延迟)
         setTimeout(() => {
             if (currentView === 'home' && !document.getElementById('customIpInput').value) autoDetectAndSetIp();
         }, 500);
