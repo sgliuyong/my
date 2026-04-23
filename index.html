@@ -156,7 +156,7 @@
     // 初始化云开发（温和检查环境ID）
     async function initCloudBase() {
         // 检查是否修改了环境ID（不能是默认的 "YOUR_ENV_ID_HERE" 或空）
-        if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "vote-system-d1g3vx03wbaef4313") {
+        if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "YOUR_ENV_ID_HERE") {
             const msg = "❌ 请先修改代码开头的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID！";
             console.error(msg);
             document.getElementById('permissionTip') && (document.getElementById('permissionTip').innerHTML = msg, document.getElementById('permissionTip').style.display = 'block');
