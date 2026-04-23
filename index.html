@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>互动投票系统 | 腾讯云开发实时同步（修复数据读取）</title>
+    <title>互动投票系统 | 腾讯云开发实时同步（最终修复版）</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
@@ -130,11 +130,11 @@
 </div>
 
 <script>
-    // ==================== 请将下面的字符串替换为您的腾讯云开发环境ID ====================
+    // ==================== 请替换为您的腾讯云开发环境ID ====================
     const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";
-    // ============================================================================
+    // ===================================================================
 
-    let app, db, pollCollection;
+    let app, db, pollDocRef;
     let currentView = 'home';
     let selectedOption = null;
     let deviceId = localStorage.getItem('vote_device_id') || ('device_' + Math.random().toString(36).substring(2) + Date.now());
@@ -160,24 +160,24 @@
         return '其他领域';
     }
 
-    // 核心函数：从数据库返回结果中提取文档数据（兼容数组和对象）
-    function extractDocData(result) {
-        if (!result) return null;
-        // 如果 result 是数组且第一个元素是文档对象
-        if (Array.isArray(result) && result.length > 0 && result[0] && typeof result[0] === 'object') {
-            return result[0];
+    // 核心：从云开发 get() 返回的结果中提取文档对象（兼容数组和对象）
+    function getDocFromResponse(res) {
+        if (!res) return null;
+        // 情况1: res 本身是数组且第一个元素是文档
+        if (Array.isArray(res) && res.length > 0 && res[0] && typeof res[0] === 'object') {
+            return res[0];
         }
-        // 如果 result 本身是文档对象且有 _id 或 votes 字段
-        if (result && typeof result === 'object' && (result._id || result.votes)) {
-            return result;
+        // 情况2: res.data 是数组
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+            return res.data[0];
         }
-        // 如果 result.data 是数组（云开发某些版本返回格式）
-        if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-            return result.data[0];
+        // 情况3: res.data 是对象
+        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+            return res.data;
         }
-        // 如果 result.data 是对象
-        if (result.data && typeof result.data === 'object' && !Array.isArray(result.data)) {
-            return result.data;
+        // 情况4: res 本身就是文档对象
+        if (res._id || res.votes) {
+            return res;
         }
         return null;
     }
@@ -198,16 +198,15 @@
             console.log("✅ 匿名登录成功");
             isLoggedIn = true;
             db = app.database();
-            pollCollection = db.collection('pollData');
-            // 尝试获取 main 文档，测试连接
+            pollDocRef = db.collection('pollData').doc('main');
+            // 测试连接
             try {
-                const test = await pollCollection.doc('main').get();
-                console.log("📄 main文档原始返回:", test);
-                const doc = extractDocData(test);
+                const test = await pollDocRef.get();
+                const doc = getDocFromResponse(test);
                 if (doc) {
-                    console.log("✅ 解析后的文档:", doc);
+                    console.log("✅ 成功读取 main 文档:", doc);
                 } else {
-                    console.warn("⚠️ 无法解析文档，可能需要先通过云函数创建");
+                    console.warn("⚠️ main 文档不存在或无法解析，请先调用一次云函数创建");
                 }
                 const tipDiv = document.getElementById('permissionTip');
                 if (tipDiv) tipDiv.style.display = 'none';
@@ -237,24 +236,23 @@
     async function fetchMyVote(deviceId) {
         if (!db || !isLoggedIn) return null;
         try {
-            const res = await pollCollection.doc('main').get();
-            const doc = extractDocData(res);
+            const res = await pollDocRef.get();
+            const doc = getDocFromResponse(res);
             if (!doc) return null;
             return doc.deviceVotes?.[deviceId] || null;
         } catch(e) { return null; }
     }
 
-    // 增强版 fetchStatsOnce: 兼容多种返回格式
+    // 获取最新统计数据（直接处理数组/对象）
     async function fetchStatsOnce() {
         if (!db || !isLoggedIn) return null;
         try {
-            const res = await pollCollection.doc('main').get();
+            const res = await pollDocRef.get();
             console.log("📥 fetchStatsOnce 原始返回:", res);
-            const doc = extractDocData(res);
+            const doc = getDocFromResponse(res);
             lastRawData = doc;
             if (!doc || !doc.votes) {
-                console.warn("⚠️ 数据库返回数据异常或votes字段缺失", doc);
-                // 返回默认结构，避免 UI 报错
+                console.warn("⚠️ 无法从返回结果中提取 votes 字段", { res, doc });
                 return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0, raw: doc };
             }
             const votes = doc.votes || { city:0, rural:0, other:0 };
@@ -265,7 +263,7 @@
             };
             const deviceCount = typeof doc.deviceCount === 'number' ? doc.deviceCount : 0;
             const totalVotes = safeVotes.city + safeVotes.rural + safeVotes.other;
-            console.log("📊 解析后的统计数据:", { safeVotes, deviceCount, totalVotes });
+            console.log("📊 解析后数据:", { safeVotes, deviceCount, totalVotes });
             return { votes: safeVotes, deviceCount, totalVotes, raw: doc };
         } catch(e) { 
             console.error("fetchStatsOnce 错误", e);
@@ -279,12 +277,12 @@
             console.warn("updateTeacherUI 收到无效数据");
             return;
         }
-        console.log("📊 开始更新教师端 UI，数据:", stats);
+        console.log("📊 更新教师端 UI，数据:", stats);
         
         const debugPanel = document.getElementById('debugDataPanel');
         if (debugPanel && stats.raw) {
-            const summary = `📅 最后数据: 城市=${stats.votes.city}, 农村=${stats.votes.rural}, 其他=${stats.votes.other} | 独立设备=${stats.deviceCount} | 总票=${stats.totalVotes}`;
-            debugPanel.innerHTML = `🔍 ${summary}<br>📄 原始文档预览: ${JSON.stringify(stats.raw).substring(0, 200)}`;
+            const summary = `城市=${stats.votes.city}, 农村=${stats.votes.rural}, 其他=${stats.votes.other} | 独立设备=${stats.deviceCount} | 总票=${stats.totalVotes}`;
+            debugPanel.innerHTML = `🔍 ${summary}<br>📄 原始数据预览: ${JSON.stringify(stats.raw).substring(0, 200)}`;
         } else if (debugPanel) {
             debugPanel.innerHTML = `⚠️ 数据解析异常，请手动刷新或检查数据库`;
         }
@@ -296,7 +294,6 @@
         const uniqueEl = document.getElementById('uniqueDevicesCount');
         
         if (cityEl) cityEl.innerText = stats.votes.city;
-        else console.error("❌ 找不到 #cityCount");
         if (ruralEl) ruralEl.innerText = stats.votes.rural;
         if (otherEl) otherEl.innerText = stats.votes.other;
         if (totalEl) totalEl.innerText = stats.totalVotes;
@@ -314,15 +311,14 @@
                 });
             }
         }
-        console.log("✅ 教师端 UI 更新完成");
     }
 
-    // 教师端实时监听 (watch) - 修正数据提取
+    // 教师端实时监听 (watch) - 修复文档提取
     function startTeacherRealtime() {
         if (unwatch) { unwatch(); unwatch = null; }
-        if (!pollCollection || !isLoggedIn) { console.warn("无法启动 watch"); return; }
+        if (!pollDocRef || !isLoggedIn) { console.warn("无法启动 watch"); return; }
         console.log("📡 建立实时监听 (watch) ...");
-        const watcher = pollCollection.doc('main').watch({
+        const watcher = pollDocRef.watch({
             onChange: (snapshot) => {
                 console.log("🔄 watch 触发 onChange, snapshot:", snapshot);
                 // snapshot.doc 可能为 null，需要从 snapshot 中提取文档
@@ -332,8 +328,8 @@
                     console.warn("watch 收到空文档，尝试从 snapshot 其他字段获取", snapshot);
                     return;
                 }
-                // 兼容可能的数组格式
-                const extracted = extractDocData({ data: doc });
+                // 使用统一的提取函数
+                const extracted = getDocFromResponse({ data: doc });
                 const data = extracted || doc;
                 if (!data || !data.votes) {
                     console.warn("watch 解析后仍无 votes 字段", data);
