@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>互动投票系统 | 腾讯云开发（修复数据更新）</title>
+    <title>互动投票系统 | 腾讯云开发 | 固定投票链接</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
     <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"></script>
@@ -16,57 +16,55 @@
         .card-body { padding: 28px; }
         .qr-wrapper { display: flex; flex-direction: column; align-items: center; padding: 20px; }
         #qrcode { display: flex; justify-content: center; margin: 16px 0; padding: 16px; background: #fff; border-radius: 28px; box-shadow: 0 12px 24px -12px rgba(0,0,0,0.15); }
-        .btn-teacher { background: linear-gradient(105deg, #0052cc, #0a66e9); color: white; font-weight: 600; padding: 14px 28px; border-radius: 48px; cursor: pointer; width: 80%; max-width: 280px; margin: 28px auto; display: block; text-align: center; border: none; }
-        .network-panel { background: #f8fafc; border-radius: 24px; padding: 16px; margin-top: 20px; border: 1px solid #e2e8f0; }
-        .ip-input-group { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-        .ip-input-group input { flex: 2; padding: 10px 14px; border-radius: 40px; border: 1px solid #cbd5e1; }
-        .ip-input-group button, .copy-link-btn { background: #eef2ff; color: #0052cc; border: none; padding: 10px 18px; border-radius: 40px; cursor: pointer; }
+        .btn-teacher { background: linear-gradient(105deg, #0052cc, #0a66e9); color: white; font-weight: 600; padding: 14px 28px; border-radius: 48px; cursor: pointer; width: 80%; max-width: 280px; margin: 28px auto; display: block; text-align: center; border: none; font-size: 1.1rem; transition: transform 0.1s; }
+        .btn-teacher:active { transform: scale(0.98); }
+        .fixed-link-panel { background: #f0f4fe; border-radius: 24px; padding: 20px 18px; margin-top: 20px; width: 100%; text-align: center; border: 1px solid #d9e6ff; }
+        .fixed-link-panel .link-title { font-weight: 600; color: #0052cc; margin-bottom: 8px; font-size: 0.95rem; }
+        .fixed-link-url { font-family: monospace; background: white; padding: 12px 12px; border-radius: 48px; word-break: break-all; font-size: 0.85rem; margin: 12px 0; border: 1px solid #cddff5; color: #1e293b; }
+        .copy-link-btn { background: #eef2ff; color: #0052cc; border: none; padding: 10px 22px; border-radius: 40px; cursor: pointer; font-weight: 500; transition: 0.2s; margin-top: 6px; }
+        .copy-link-btn:active { background: #d9e4ff; }
         .options-grid { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; margin-bottom: 36px; }
         .option-card { flex: 1; min-width: 220px; background: #fff; border-radius: 28px; border: 1.5px solid #e9edf2; cursor: pointer; transition: 0.2s; }
-        .option-card.selected { border-color: #0052cc; background: #f6f9ff; transform: scale(1.02); }
-        .option-img { width: 100%; height: 180px; object-fit: cover; }
+        .option-card.selected { border-color: #0052cc; background: #f6f9ff; transform: scale(1.02); box-shadow: 0 8px 20px rgba(0,82,204,0.12); }
+        .option-img { width: 100%; height: 180px; object-fit: cover; border-radius: 28px 28px 0 0; }
         .option-label { padding: 18px 12px; text-align: center; font-weight: 700; font-size: 1.2rem; }
-        .vote-btn { background: #0052cc; color: white; font-size: 1.25rem; font-weight: 600; padding: 14px 24px; border: none; border-radius: 56px; width: 70%; display: block; margin: 8px auto; cursor: pointer; }
+        .vote-btn { background: #0052cc; color: white; font-size: 1.25rem; font-weight: 600; padding: 14px 24px; border: none; border-radius: 56px; width: 70%; display: block; margin: 8px auto; cursor: pointer; transition: 0.2s; }
+        .vote-btn:active { transform: scale(0.97); background: #0040a3; }
         .chart-container { width: 100%; height: 400px; margin-top: 10px; }
         .stats-info { background: #f9fbfe; border-radius: 28px; padding: 20px 24px; margin-top: 28px; display: flex; justify-content: space-around; text-align: center; flex-wrap: wrap; gap: 20px; }
         .stat-number { font-size: 2.2rem; font-weight: 800; color: #0052cc; }
         .footer-note { margin-top: 28px; text-align: center; font-size: 0.8rem; color: #8ca3ba; }
-        .refresh-btn { background: #eef2ff; border: none; color: #0052cc; padding: 8px 18px; border-radius: 40px; cursor: pointer; }
-        .toast-msg { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #1e293bdd; backdrop-filter: blur(12px); color: white; padding: 12px 26px; border-radius: 60px; z-index: 1100; pointer-events: none; }
+        .refresh-btn { background: #eef2ff; border: none; color: #0052cc; padding: 8px 18px; border-radius: 40px; cursor: pointer; font-weight: 500; }
+        .toast-msg { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #1e293bdd; backdrop-filter: blur(12px); color: white; padding: 12px 26px; border-radius: 60px; z-index: 1100; pointer-events: none; font-weight: 500; }
         .extra-stats { display: flex; gap: 16px; margin-bottom: 20px; }
         .extra-stat-card { flex: 1; text-align: center; background: #f8fafc; border-radius: 20px; padding: 12px; }
-        .extra-number { font-size: 1.8rem; font-weight: 800; }
+        .extra-number { font-size: 1.8rem; font-weight: 800; color: #0052cc; }
         .permission-tip { background: #e6f7ff; border-left: 5px solid #1890ff; padding: 10px 15px; border-radius: 16px; margin-bottom: 16px; font-size: 0.8rem; }
         .debug-panel { background: #f1f5f9; border-radius: 20px; padding: 12px 16px; margin-top: 20px; font-size: 0.75rem; font-family: monospace; word-break: break-all; }
-        .force-refresh-btn { background: #0052cc; color: white; border: none; padding: 6px 16px; border-radius: 30px; cursor: pointer; margin-left: 12px; }
-        @media (max-width: 760px) { .options-grid { flex-direction: column; } .vote-btn { width: 90%; } }
+        .force-refresh-btn { background: #0052cc; color: white; border: none; padding: 6px 16px; border-radius: 30px; cursor: pointer; margin-left: 12px; font-size: 0.75rem; }
+        @media (max-width: 760px) { .options-grid { flex-direction: column; } .vote-btn { width: 90%; } .fixed-link-url { font-size: 0.7rem; } }
     </style>
 </head>
 <body>
 <div id="app">
-    <!-- 首页 -->
+    <!-- 首页：固化二维码 + 固定投票链接 -->
     <div id="homeView" class="container" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div class="card" style="width: 100%; max-width: 620px;">
             <div class="card-header" style="text-align: center;">🗳️ 互动投票系统 · 云端实时同步</div>
             <div class="card-body qr-wrapper">
                 <div id="qrcode"></div>
-                <div class="qr-tip" id="qrTipText">📱 学生扫码参与</div>
-                <div class="network-panel">
-                    <label>🌐 当前访问地址：</label>
-                    <div id="currentAccessUrl" style="font-family: monospace; background:#fff; padding:6px 10px; border-radius: 40px; margin-top: 6px; word-break:break-all;"></div>
-                    <div style="margin-top: 12px;">
-                        <label>📡 手机扫码请确保能访问此地址：</label>
-                        <div class="ip-input-group">
-                            <input type="text" id="customIpInput" placeholder="例如 192.168.1.100">
-                            <button id="updateQrBtn">更新二维码</button>
-                        </div>
-                        <button id="copyStudentLinkBtn" class="copy-link-btn">📋 复制投票链接</button>
-                        <button id="autoDetectIpBtn" class="copy-link-btn">🔄 自动检测局域网IP</button>
-                        <div id="detectedIpInfo" class="detected-ip"></div>
-                    </div>
+                <div class="qr-tip" id="qrTipText" style="margin-top: 8px; font-weight: 500;">📱 学生扫码即可参与投票</div>
+                
+                <!-- 固化链接面板，二维码永远指向固定地址 -->
+                <div class="fixed-link-panel">
+                    <div class="link-title">🔗 永久投票链接（二维码已固化）</div>
+                    <div class="fixed-link-url" id="currentAccessUrl">https://sgliuyong.github.io?role=student</div>
+                    <button id="copyStudentLinkBtn" class="copy-link-btn">📋 复制投票链接</button>
+                    <div style="font-size: 12px; color: #4b6b9f; margin-top: 10px;">✅ 二维码永久有效，无需重复生成，任何网络环境均可扫码</div>
                 </div>
+
                 <button id="teacherEnterBtn" class="btn-teacher">👩‍🏫 教师进入后台</button>
-                <div class="footer-note">🔥 腾讯云开发实时同步 | 支持覆盖投票</div>
+                <div class="footer-note">🔥 腾讯云开发实时同步 | 支持覆盖投票 | 固定链接不失效</div>
             </div>
         </div>
     </div>
@@ -79,20 +77,20 @@
                 <div class="card-body">
                     <div class="options-grid" id="optionsGrid">
                         <div class="option-card" data-value="city">
-                            <img class="option-img" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&h=300&fit=crop">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&h=300&fit=crop" alt="城市写字楼">
                             <div class="option-label">🏙️ 城市写字楼</div>
                         </div>
                         <div class="option-card" data-value="rural">
-                            <img class="option-img" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=500&h=300&fit=crop">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=500&h=300&fit=crop" alt="基层农村">
                             <div class="option-label">🌾 基层农村</div>
                         </div>
                         <div class="option-card" data-value="other">
-                            <img class="option-img" src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&h=300&fit=crop">
+                            <img class="option-img" src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=500&h=300&fit=crop" alt="其他领域">
                             <div class="option-label">🚀 其他领域</div>
                         </div>
                     </div>
                     <button id="submitVoteBtn" class="vote-btn">🗳️ 立即投票</button>
-                    <div class="footer-note">💡 可再次投票覆盖原选择</div>
+                    <div class="footer-note">💡 可再次投票覆盖原选择，设备ID自动记录</div>
                 </div>
             </div>
         </div>
@@ -122,7 +120,7 @@
                     <div class="debug-panel" id="debugDataPanel">
                         💡 调试信息: 等待数据加载...
                     </div>
-                    <div class="footer-note">📡 WebSocket 实时同步 + 轮询兜底 (每3秒) | 已修复数据读取格式兼容性</div>
+                    <div class="footer-note">📡 WebSocket 实时同步 + 轮询兜底 (每3秒) | 投票数据云端存储</div>
                 </div>
             </div>
         </div>
@@ -130,10 +128,13 @@
 </div>
 
 <script>
-    // ==================== 请替换为您的腾讯云开发环境ID ====================
+    // ==================== 腾讯云开发环境ID (请确保安全域名已添加 sgliuyong.github.io) ====================
     const CLOUDBASE_ENV_ID = "vote-system-d1g3vx03wbaef4313";
-    // ===================================================================
+    // =========================================================================================
 
+    // 固定投票链接 (二维码永不失效)
+    const FIXED_VOTE_URL = "https://sgliuyong.github.io?role=student";
+    
     let app, db, pollDocRef;
     let currentView = 'home';
     let selectedOption = null;
@@ -145,6 +146,7 @@
     let loginPromise = null;
     let pollingInterval = null;
 
+    // 通用toast提示
     function showToast(msg, duration = 2600) {
         let toast = document.querySelector('.toast-msg');
         if (!toast) { toast = document.createElement('div'); toast.className = 'toast-msg'; document.body.appendChild(toast); }
@@ -159,29 +161,17 @@
         return '其他领域';
     }
 
-    // 核心：从云开发 get() 返回的结果中提取文档对象（兼容数组和对象）
+    // 兼容云开发返回结构
     function getDocFromResponse(res) {
         if (!res) return null;
-        // 情况1: res 本身是数组且第一个元素是文档
-        if (Array.isArray(res) && res.length > 0 && res[0] && typeof res[0] === 'object') {
-            return res[0];
-        }
-        // 情况2: res.data 是数组
-        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-            return res.data[0];
-        }
-        // 情况3: res.data 是对象
-        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-            return res.data;
-        }
-        // 情况4: res 本身就是文档对象
-        if (res._id || res.votes) {
-            return res;
-        }
+        if (Array.isArray(res) && res.length > 0 && res[0] && typeof res[0] === 'object') return res[0];
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) return res.data[0];
+        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) return res.data;
+        if (res._id || res.votes) return res;
         return null;
     }
 
-    // 初始化云开发
+    // 初始化云开发 & 匿名登录
     async function initCloudBase() {
         if (!CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID === "YOUR_ENV_ID_HERE") {
             const msg = "❌ 请先修改代码开头的 CLOUDBASE_ENV_ID 为您的腾讯云开发环境ID！";
@@ -198,27 +188,23 @@
             isLoggedIn = true;
             db = app.database();
             pollDocRef = db.collection('pollData').doc('main');
-            // 测试连接
             try {
                 const test = await pollDocRef.get();
                 const doc = getDocFromResponse(test);
-                if (doc) {
-                    console.log("✅ 成功读取 main 文档:", doc);
-                } else {
-                    console.warn("⚠️ main 文档不存在或无法解析，请先调用一次云函数创建");
-                }
+                if (doc) console.log("✅ main文档可读", doc);
+                else console.warn("⚠️ main文档不存在，确保云函数已创建");
                 const tipDiv = document.getElementById('permissionTip');
                 if (tipDiv) tipDiv.style.display = 'none';
             } catch (err) {
                 console.error("❌ 读取main文档失败", err);
                 const tipDiv = document.getElementById('permissionTip');
-                if (tipDiv) { tipDiv.style.display = 'block'; tipDiv.innerHTML = '⚠️ 无法读取 main 文档，请检查：1) pollData 集合权限是否为“所有用户可读”；2) 文档 _id 是否为 "main"；3) 云函数是否已成功创建文档。'; }
-                showToast("无法读取投票数据，请检查数据库权限和 main 文档是否存在", 5000);
+                if (tipDiv) { tipDiv.style.display = 'block'; tipDiv.innerHTML = '⚠️ 无法读取 main 文档，请检查：1) pollData 集合权限为“所有用户可读”；2) _id 是否为 "main"；3) 云函数已部署。'; }
+                showToast("数据库读取异常，请检查权限或main文档", 5000);
             }
             return true;
         }).catch(err => {
             console.error("登录失败", err);
-            showToast("云开发初始化失败，请检查环境ID、匿名登录开关及网络", 5000);
+            showToast("云开发初始化失败，请检查环境ID及匿名登录开关", 5000);
             throw err;
         });
         await loginPromise;
@@ -248,10 +234,10 @@
         if (!db || !isLoggedIn) return null;
         try {
             const res = await pollDocRef.get();
-            console.log("📥 fetchStatsOnce 原始返回:", res);
+            console.log("📥 拉取数据原始返回:", res);
             const doc = getDocFromResponse(res);
             if (!doc || !doc.votes) {
-                console.warn("⚠️ 无法从返回结果中提取 votes 字段", { res, doc });
+                console.warn("⚠️ 无votes字段", { doc });
                 return { votes: { city:0, rural:0, other:0 }, deviceCount:0, totalVotes:0, raw: doc };
             }
             const votes = doc.votes || { city:0, rural:0, other:0 };
@@ -265,25 +251,24 @@
             console.log("📊 解析后数据:", { safeVotes, deviceCount, totalVotes });
             return { votes: safeVotes, deviceCount, totalVotes, raw: doc };
         } catch(e) { 
-            console.error("fetchStatsOnce 错误", e);
+            console.error("fetchStatsOnce错误", e);
             return null; 
         }
     }
 
-    // 更新教师端UI
+    // 更新教师端UI (图表 + 统计数字)
     function updateTeacherUI(stats) {
         if (!stats) {
-            console.warn("updateTeacherUI 收到无效数据");
+            console.warn("updateTeacherUI 无效数据");
             return;
         }
-        console.log("📊 更新教师端 UI，数据:", stats);
-        
+        console.log("📊 更新教师端UI", stats);
         const debugPanel = document.getElementById('debugDataPanel');
         if (debugPanel && stats.raw) {
             const summary = `城市=${stats.votes.city}, 农村=${stats.votes.rural}, 其他=${stats.votes.other} | 独立设备=${stats.deviceCount} | 总票=${stats.totalVotes}`;
-            debugPanel.innerHTML = `🔍 ${summary}<br>📄 原始数据预览: ${JSON.stringify(stats.raw).substring(0, 200)}`;
+            debugPanel.innerHTML = `🔍 ${summary}<br>📄 原始数据预览: ${JSON.stringify(stats.raw).substring(0, 220)}`;
         } else if (debugPanel) {
-            debugPanel.innerHTML = `⚠️ 数据解析异常，请手动刷新或检查数据库`;
+            debugPanel.innerHTML = `⚠️ 数据解析异常，请手动刷新或检查数据库结构`;
         }
 
         const cityEl = document.getElementById('cityCount');
@@ -291,7 +276,6 @@
         const otherEl = document.getElementById('otherCount');
         const totalEl = document.getElementById('totalVotesCount');
         const uniqueEl = document.getElementById('uniqueDevicesCount');
-        
         if (cityEl) cityEl.innerText = stats.votes.city;
         if (ruralEl) ruralEl.innerText = stats.votes.rural;
         if (otherEl) otherEl.innerText = stats.votes.other;
@@ -315,30 +299,23 @@
     // 教师端实时监听 (watch)
     function startTeacherRealtime() {
         if (unwatch) { unwatch(); unwatch = null; }
-        if (!pollDocRef || !isLoggedIn) { console.warn("无法启动 watch"); return; }
+        if (!pollDocRef || !isLoggedIn) { console.warn("无法启动watch"); return; }
         console.log("📡 建立实时监听 (watch) ...");
         const watcher = pollDocRef.watch({
             onChange: (snapshot) => {
-                console.log("🔄 watch 触发 onChange, snapshot:", snapshot);
-                let doc = snapshot.doc;
-                if (!doc && snapshot.data) doc = snapshot.data;
-                if (!doc) {
-                    console.warn("watch 收到空文档，尝试从 snapshot 其他字段获取", snapshot);
-                    return;
-                }
+                console.log("🔄 watch触发");
+                let doc = snapshot.doc || snapshot.data;
+                if (!doc) return;
                 const extracted = getDocFromResponse({ data: doc });
                 const data = extracted || doc;
-                if (!data || !data.votes) {
-                    console.warn("watch 解析后仍无 votes 字段", data);
-                    return;
-                }
+                if (!data || !data.votes) return;
                 const votes = data.votes || { city:0, rural:0, other:0 };
                 const deviceCount = data.deviceCount || 0;
                 const totalVotes = (votes.city || 0) + (votes.rural || 0) + (votes.other || 0);
                 updateTeacherUI({ votes: { city: votes.city||0, rural: votes.rural||0, other: votes.other||0 }, deviceCount, totalVotes, raw: data });
             },
             onError: (err) => {
-                console.error("❌ watch 出错", err);
+                console.error("❌ watch出错", err);
                 showToast("实时连接中断，使用轮询更新", 3000);
             }
         });
@@ -353,7 +330,7 @@
                 if (stats) updateTeacherUI(stats);
             }
         }, 3000);
-        console.log("⏱️ 轮询已启动 (3秒间隔)");
+        console.log("⏱️ 轮询启动 (3秒)");
     }
 
     function stopPolling() {
@@ -362,14 +339,8 @@
 
     function initTeacherChart() {
         const dom = document.getElementById('barChart');
-        if (!dom) {
-            console.error("找不到 #barChart 元素");
-            return false;
-        }
-        if (barChart) {
-            try { barChart.dispose(); } catch(e) {}
-            barChart = null;
-        }
+        if (!dom) return false;
+        if (barChart) { try { barChart.dispose(); } catch(e) {} barChart = null; }
         try {
             barChart = echarts.init(dom);
             barChart.setOption({
@@ -379,15 +350,16 @@
                 series: [{ type: 'bar', data: [0,0,0], itemStyle: { borderRadius: [12,12,0,0], color: '#0052cc' }, label: { show: true } }]
             });
             return true;
-        } catch (err) {
+        } catch(err) {
             console.error("图表初始化异常", err);
             return false;
         }
     }
 
+    // 学生投票逻辑
     async function handleStudentVote(newOption) {
         try {
-            if (!isLoggedIn) { showToast("系统初始化中"); return false; }
+            if (!isLoggedIn) { showToast("系统初始化中，请稍后"); return false; }
             const oldVote = await fetchMyVote(deviceId);
             if (oldVote && oldVote !== newOption && !confirm(`已投“${getOptionText(oldVote)}”，是否改为“${getOptionText(newOption)}”？`)) {
                 showToast("未更改投票");
@@ -400,7 +372,6 @@
                 document.querySelectorAll('.option-card').forEach(card => {
                     card.classList.toggle('selected', card.getAttribute('data-value') === newOption);
                 });
-                // 投票成功后主动触发一次教师端刷新（如果教师端开着）
                 if (currentView === 'teacher') {
                     const stats = await fetchStatsOnce();
                     if (stats) updateTeacherUI(stats);
@@ -448,63 +419,37 @@
         }
     }
 
-    // ----- 二维码与地址 -----
-    function getStudentVoteUrl(host) { return `${window.location.protocol}//${host}?role=student`; }
-    function generateQRCodeWithHost(host) {
-        const container = document.getElementById('qrcode');
-        if (!container) return;
-        container.innerHTML = '';
-        const url = getStudentVoteUrl(host);
-        new QRCode(container, { text: url, width: 200, height: 200, colorDark: "#0052cc", correctLevel: QRCode.CorrectLevel.H });
-        document.getElementById('qrTipText').innerHTML = `📱 扫码投票 (${url})`;
-        const copyBtn = document.getElementById('copyStudentLinkBtn');
-        if (copyBtn) copyBtn.setAttribute('data-link', url);
-        const urlDiv = document.getElementById('currentAccessUrl');
-        if (urlDiv) urlDiv.innerText = url;
-    }
-    function refreshQrWithIp(ip) {
-        let finalHost = ip.trim() || window.location.host;
-        if (!finalHost.includes(':') && window.location.port && !['80','443'].includes(window.location.port)) finalHost += ':' + window.location.port;
-        generateQRCodeWithHost(finalHost);
-    }
-    function getLocalIPs(cb) {
-        const ips = [];
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        pc.createDataChannel('');
-        pc.createOffer().then(o => pc.setLocalDescription(o)).catch(e=>console.warn);
-        pc.onicecandidate = (e) => {
-            if (!e || !e.candidate) {
-                const ip = ips.find(i=>i.startsWith('192.168.')||i.startsWith('10.')||i.startsWith('172.')) || ips[0];
-                cb(ip || null);
-                pc.close();
-                return;
-            }
-            const match = e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);
-            if (match && !ips.includes(match[0])) ips.push(match[0]);
-        };
-        setTimeout(() => { cb(null); pc.close(); }, 2000);
-    }
-    async function autoDetectAndSetIp() {
-        showToast("检测局域网IP...");
-        getLocalIPs((ip) => {
-            if (ip) {
-                document.getElementById('customIpInput').value = ip;
-                refreshQrWithIp(ip);
-                const infoDiv = document.getElementById('detectedIpInfo');
-                if (infoDiv) infoDiv.innerHTML = `✅ 已设置IP: ${ip}`;
-            } else {
-                const infoDiv = document.getElementById('detectedIpInfo');
-                if (infoDiv) infoDiv.innerHTML = `❌ 自动检测失败，请手动输入`;
-            }
+    // ************ 固化二维码生成逻辑 (永远指向固定链接) ************
+    function generateFixedQRCodeAndLink() {
+        const qrcodeContainer = document.getElementById('qrcode');
+        if (!qrcodeContainer) return;
+        qrcodeContainer.innerHTML = '';
+        // 生成固定链接的二维码
+        new QRCode(qrcodeContainer, { 
+            text: FIXED_VOTE_URL, 
+            width: 200, 
+            height: 200, 
+            colorDark: "#0052cc", 
+            correctLevel: QRCode.CorrectLevel.H 
         });
-    }
-    function copyStudentLink() {
-        const link = document.getElementById('copyStudentLinkBtn')?.getAttribute('data-link');
-        if (link) navigator.clipboard.writeText(link).then(()=>showToast("链接已复制"));
-        else showToast("请先生成二维码");
+        // 设置提示文字 + 复制按钮数据
+        const qrTip = document.getElementById('qrTipText');
+        if (qrTip) qrTip.innerHTML = `📱 扫码访问固定投票页 (${FIXED_VOTE_URL})`;
+        
+        const urlDiv = document.getElementById('currentAccessUrl');
+        if (urlDiv) urlDiv.innerText = FIXED_VOTE_URL;
+        
+        const copyBtn = document.getElementById('copyStudentLinkBtn');
+        if (copyBtn) copyBtn.setAttribute('data-link', FIXED_VOTE_URL);
     }
 
-    // 视图切换
+    // 复制链接按钮功能
+    function copyStudentFixedLink() {
+        const link = document.getElementById('copyStudentLinkBtn')?.getAttribute('data-link') || FIXED_VOTE_URL;
+        navigator.clipboard.writeText(link).then(() => showToast("投票链接已复制")).catch(() => showToast("复制失败，手动复制"));
+    }
+
+    // 视图切换控制
     async function showView(view) {
         if (!isLoggedIn) {
             try { await loginPromise; } catch(e) { showToast("初始化中，请稍后"); return; }
@@ -512,12 +457,13 @@
         document.getElementById('homeView').style.display = 'none';
         document.getElementById('studentView').style.display = 'none';
         document.getElementById('teacherView').style.display = 'none';
+        
         if (view === 'home') {
             document.getElementById('homeView').style.display = 'flex';
             currentView = 'home';
             if (unwatch) unwatch();
             stopPolling();
-            refreshQrWithIp(document.getElementById('customIpInput').value || window.location.host);
+            generateFixedQRCodeAndLink();   // 二维码固化
         } else if (view === 'student') {
             document.getElementById('studentView').style.display = 'block';
             currentView = 'student';
@@ -533,12 +479,13 @@
             initTeacherChart();
             const stats = await fetchStatsOnce();
             if (stats) updateTeacherUI(stats);
-            else showToast("无法获取数据，请检查权限", 3000);
+            else showToast("无法获取数据，请检查数据库权限", 3000);
             startTeacherRealtime();
             startPolling();
         }
     }
 
+    // 路由解析: role 参数控制视图
     function handleRouting() {
         const role = new URLSearchParams(window.location.search).get('role');
         if (role === 'student') showView('student');
@@ -546,42 +493,66 @@
         else showView('home');
     }
 
+    // 全局调试辅助
     window.debugTeacherUI = async function() {
         const stats = await fetchStatsOnce();
         console.log("强制调试数据:", stats);
         if (stats) updateTeacherUI(stats);
     };
 
+    // 页面入口
     window.addEventListener('DOMContentLoaded', async () => {
         await initCloudBase();
-        showToast("系统已连接", 2000);
-        document.getElementById('teacherEnterBtn').onclick = () => { showView('teacher'); window.history.pushState({}, '', '?role=teacher'); };
-        document.getElementById('manualRefreshBtn').onclick = async () => {
-            if (currentView === 'teacher') {
+        showToast("系统已连接，二维码已永久固化", 2500);
+        
+        // 绑定教师进入后台按钮
+        const teacherBtn = document.getElementById('teacherEnterBtn');
+        if (teacherBtn) {
+            teacherBtn.onclick = () => { showView('teacher'); window.history.pushState({}, '', '?role=teacher'); };
+        }
+        // 教师端手动刷新
+        const manualRefresh = document.getElementById('manualRefreshBtn');
+        if (manualRefresh) {
+            manualRefresh.onclick = async () => {
+                if (currentView === 'teacher') {
+                    const stats = await fetchStatsOnce();
+                    if (stats) updateTeacherUI(stats);
+                    showToast("手动刷新完成");
+                }
+            };
+        }
+        // 强制重绘图表
+        const forceRender = document.getElementById('forceRenderBtn');
+        if (forceRender) {
+            forceRender.onclick = async () => {
+                if (currentView === 'teacher') {
+                    initTeacherChart();
+                    const stats = await fetchStatsOnce();
+                    if (stats) updateTeacherUI(stats);
+                    showToast("强制重绘完成");
+                }
+            };
+        }
+        // 打印调试信息按钮
+        const debugBtn = document.getElementById('debugLogBtn');
+        if (debugBtn) {
+            debugBtn.onclick = async () => {
                 const stats = await fetchStatsOnce();
-                if (stats) updateTeacherUI(stats);
-                showToast("手动刷新完成");
-            }
-        };
-        document.getElementById('forceRenderBtn').onclick = async () => {
-            if (currentView === 'teacher') {
-                initTeacherChart();
-                const stats = await fetchStatsOnce();
-                if (stats) updateTeacherUI(stats);
-                showToast("强制重绘完成");
-            }
-        };
-        document.getElementById('debugLogBtn').onclick = async () => {
-            const stats = await fetchStatsOnce();
-            console.table(stats?.votes);
-            alert(`城市:${stats?.votes.city} 农村:${stats?.votes.rural} 其他:${stats?.votes.other}\n独立设备:${stats?.deviceCount}`);
-        };
-        document.getElementById('updateQrBtn').onclick = () => refreshQrWithIp(document.getElementById('customIpInput').value);
-        document.getElementById('copyStudentLinkBtn').onclick = copyStudentLink;
-        document.getElementById('autoDetectIpBtn').onclick = autoDetectAndSetIp;
+                console.table(stats?.votes);
+                alert(`城市:${stats?.votes.city} 农村:${stats?.votes.rural} 其他:${stats?.votes.other}\n独立设备:${stats?.deviceCount}`);
+            };
+        }
+        // 复制链接按钮
+        const copyBtn = document.getElementById('copyStudentLinkBtn');
+        if (copyBtn) copyBtn.onclick = copyStudentFixedLink;
+        
+        // 监听浏览器前进后退
         window.addEventListener('popstate', () => handleRouting());
         handleRouting();
-        setTimeout(() => { if (currentView === 'home') autoDetectAndSetIp(); }, 500);
+        // 额外确保首页二维码已生成（再次保证）
+        setTimeout(() => {
+            if (currentView === 'home') generateFixedQRCodeAndLink();
+        }, 200);
     });
 </script>
 </body>
