@@ -58,7 +58,7 @@
                 <!-- 固化链接面板，二维码永远指向固定地址 -->
                 <div class="fixed-link-panel">
                     <div class="link-title">🔗 永久投票链接（二维码已固化）</div>
-                    <div class="fixed-link-url" id="currentAccessUrl">https://sgliuyong.github.io?role=student</div>
+                    <div class="fixed-link-url" id="currentAccessUrl">https://sgliuyong.github.io/my/?role=student</div>
                     <button id="copyStudentLinkBtn" class="copy-link-btn">📋 复制投票链接</button>
                     <div style="font-size: 12px; color: #4b6b9f; margin-top: 10px;">✅ 二维码永久有效，无需重复生成，任何网络环境均可扫码</div>
                 </div>
@@ -133,7 +133,7 @@
     // =========================================================================================
 
     // 固定投票链接 (二维码永不失效)
-    const FIXED_VOTE_URL = "https://sgliuyong.github.io?role=student";
+    const FIXED_VOTE_URL = "https://sgliuyong.github.io/my/?role=student";
     
     let app, db, pollDocRef;
     let currentView = 'home';
