@@ -103,10 +103,6 @@
                 <div class="card-header">📊 实时投票分析 <button id="forceRenderBtn" class="force-refresh-btn" style="font-size:0.8rem;">🔧 强制重绘</button></div>
                 <div class="card-body">
                     <div class="permission-tip" id="permissionTip" style="display: none;">⚠️ 数据库权限或文档问题，请检查 pollData 集合权限为“所有用户可读”且存在 main 文档。</div>
-                    <div class="extra-stats">
-                        <div class="extra-stat-card"><span>📱 总投票次数</span><div class="extra-number" id="totalVotesCount">0</div></div>
-                        <div class="extra-stat-card"><span>👥 独立设备数</span><div class="extra-number" id="uniqueDevicesCount">0</div></div>
-                    </div>
                     <div id="barChart" class="chart-container"></div>
                     <div class="stats-info">
                         <div class="stat-item"><h4>🏙️ 城市写字楼</h4><span class="stat-number" id="cityCount">0</span></div>
@@ -116,10 +112,7 @@
                     <div style="display: flex; justify-content: center; gap: 16px; margin: 16px 0;">
                         <button id="manualRefreshBtn" class="refresh-btn">🔄 手动刷新数据</button>
                         <button id="debugLogBtn" class="refresh-btn">🐞 打印调试信息</button>
-                    </div>
-                    <div class="debug-panel" id="debugDataPanel">
-                        💡 调试信息: 等待数据加载...
-                    </div>
+                    </div> 
                     <div class="footer-note">📡 WebSocket 实时同步 + 轮询兜底 (每3秒) | 投票数据云端存储</div>
                 </div>
             </div>
